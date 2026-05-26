@@ -919,8 +919,9 @@
     map.on("locationerror", () => { el.gpsBtn.classList.remove("active"); toast("GPS non disponibile."); });
 
     let searchedParcelMarker = null;
-
-    el.btnSearchParcel.addEventListener("click", async () => {
+    let searchedParcelLayer = null; // Terrà traccia della sagoma della particella
+    
+el.btnSearchParcel.addEventListener("click", async () => {
       const comune = el.searchComune.value;
       const foglio = el.searchFoglio.value.trim();
       const particella = el.searchParticella.value.trim();
@@ -930,54 +931,54 @@
         return;
       }
 
-      toast("Ricerca coordinate in corso...");
+      // Mostra il loader HUD nativo della tua app
+      el.loader.classList.add("active");
+      toast("Interrogazione database geospaziale...");
 
       try {
-        // ===========================================================================
-        // ATTENZIONE: INSERISCI QUI LA CHIAMATA ALLA TUA API DI GEOCODING
-        // Poiché il WMS dell'Agenzia delle Entrate non supporta la ricerca inversa, 
-        // devi interrogare un tuo backend o un servizio API per convertire i dati.
-        // ===========================================================================
+        // Chiamata all'endpoint relativo di Vercel
+        const url = `/api/cerca-particella?comune=${encodeURIComponent(comune)}&foglio=${encodeURIComponent(foglio)}&particella=${encodeURIComponent(particella)}`;
         
-        /* ESEMPIO DI CHIAMATA REALE A UN TUO BACKEND:
-        const url = `https://api.tuosito.it/geocoder?comune=${comune}&foglio=${foglio}&particella=${particella}`;
         const res = await fetch(url);
-        if (!res.ok) throw new Error("Particella non trovata nel database.");
         const data = await res.json();
-        const lat = data.latitudine;
-        const lng = data.longitudine;
-        */
+        
+        if (!res.ok) {
+          throw new Error(data.error || "Impossibile trovare la particella.");
+        }
 
-        // Simulazione di una ricerca fallita senza backend collegato
-        throw new Error("Collega un'API di Geocoding per risolvere le coordinate.");
-
-        // === QUANDO AVRAI LE COORDINATE (es. lat e lng), SCOMMENTA QUESTO BLOCCO ===
-        /*
-        // 1. Rimuovi il marker precedente se esiste
+        // 1. Rimuovi eventuali poligoni o marker di ricerche precedenti
+        if (searchedParcelLayer) map.removeLayer(searchedParcelLayer);
         if (searchedParcelMarker) map.removeLayer(searchedParcelMarker);
 
-        // 2. Centra la mappa con un bello zoom sulla particella
-        map.setView([lat, lng], 20, { animate: true, duration: 1.5 });
+        // 2. Centra la mappa sulle coordinate del centroide restituite da PostGIS
+        map.setView(data.centro, 19.5, { animate: true, duration: 1.5 });
 
-        // 3. Aggiungi un marker colorato e pulsante al centro
-        searchedParcelMarker = L.circleMarker([lat, lng], { 
-          radius: 12, 
-          color: "#fff", 
-          weight: 2, 
-          fillColor: "#ff2d6f", 
-          fillOpacity: 0.8 
+        // 3. Disegna i confini reali geometrici estratti dal tuo file GML/GeoJSON
+        searchedParcelLayer = L.geoJSON(data.geometria, {
+          style: {
+            color: "#ff2d6f",       // Colore Rosa Neon coerente con il tuo stile HUD (--danger)
+            weight: 3,              // Spessore del bordo del lotto
+            fillColor: "#ff2d6f",   // Colore di riempimento della particella
+            fillOpacity: 0.25       // Opacità interna per far vedere lo sfondo della mappa
+          }
         }).addTo(map);
 
-        searchedParcelMarker.bindPopup(`<div class="popup-title">Particella ${particella}</div><div class="row-sub">Foglio ${foglio}</div>`).openPopup();
+        // 4. Associa un popup informativo alla sagoma geometrica
+        searchedParcelLayer.bindPopup(`
+          <div class="popup-title" style="color: #ff2d6f; font-weight:800; margin-bottom:4px;">Particella Individuata</div>
+          <div class="row-sub">Comune: ${comune}<br>Foglio: ${foglio}<br>Particella: ${particella}</div>
+        `).openPopup();
         
-        // 4. Chiudi il drawer per lasciar vedere la mappa
+        // 5. Chiudi il drawer laterale per mostrare la mappa (ottimo su Mobile)
         el.drawer.classList.remove("open");
-        toast(`Mappa centrata sulla particella ${particella}!`);
-        */
+        toast(`Visualizzati i confini di Foglio ${foglio}, Particella ${particella}`);
 
       } catch (err) {
         toast(err.message, 4000);
-        console.warn("Manca l'endpoint di geocoding inverso. Il WMS dell'AdE accetta solo click (GetFeatureInfo) e non query testuali sui server pubblici.");
+        console.error("Errore Geocoding Spaziale:", err);
+      } finally {
+        // Rimuove il loader HUD al termine della chiamata
+        el.loader.classList.remove("active");
       }
     });
 
