@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>App Rilievi Pro</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+
+  <style>
+    :root {
+      --ink: #f5fbff;
+      --muted: #8ea4ad;
+      --panel: rgba(5, 10, 18, .9);
+      --panel-solid: #050a12;
+      --line: rgba(0, 245, 255, .28);
+      --field: rgba(0, 245, 255, .08);
+      --accent: #00f5ff;
+      --accent-2: #a5ff2f;
+      --warn: #ffcc33;
+      --danger: #ff2d6f;
+      --shadow: 0 18px 60px rgba(0,0,0,.58), 0 0 26px rgba(0,245,255,.16);
+      --r: 8px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body, #map { width: 100%; height: 100%; margin: 0; }
+    body {
+      overflow: hidden;
+      color: var(--ink);
+      background: #01040b;
+      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+      letter-spacing: 0;
+      touch-action: none;
+    }
+
+    #map { z-index: 1; background: #01040b; filter: saturate(1.18) contrast(1.08); }
+    
+    .hud-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 650;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(0,245,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,245,255,.045) 1px, transparent 1px),
+        radial-gradient(circle at 72% 15%, rgba(255,45,111,.14), transparent 26%),
+        radial-gradient(circle at 10% 80%, rgba(0,245,255,.12), transparent 28%);
+      background-size: 72px 72px, 72px 72px, auto, auto;
+      mix-blend-mode: screen;
+    }
+    
+    .leaflet-top.leaflet-right { top: 80px !important; }
+    
+    .leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow) !important; }
+    .leaflet-control-zoom a {
+      width: 42px !important; height: 42px !important; line-height: 42px !important;
+      color: var(--ink) !important; background: var(--panel) !important; border-color: var(--line) !important;
+    }
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+      color: var(--ink); background: var(--panel-solid); border: 1px solid var(--line); box-shadow: var(--shadow);
+    }
+    .leaflet-popup-content { margin: 13px 14px; min-width: 190px; }
+    .leaflet-container a.leaflet-popup-close-button { color: var(--muted); }
+
+    .icon {
+      font-family: "Material Symbols Rounded"; font-weight: 500; font-style: normal;
+      font-size: 24px; line-height: 1; display: inline-block; white-space: nowrap; direction: ltr; font-feature-settings: "liga";
+    }
+
+    button, input, select { font: inherit; }
+    button { border: 0; color: inherit; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+    .fab {
+      width: 50px; height: 50px; display: grid; place-items: center;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: linear-gradient(145deg, rgba(0,245,255,.16), rgba(255,45,111,.08)), var(--panel);
+      box-shadow: var(--shadow); backdrop-filter: blur(18px);
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+      clip-path: polygon(14% 0, 100% 0, 100% 84%, 84% 100%, 0 100%, 0 14%);
+      text-shadow: 0 0 12px currentColor;
+    }
+    .fab:active { transform: scale(.96); }
+    .fab.active { color: #001015; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: rgba(255,255,255,.5); }
+
+    .top-left { position: fixed; z-index: 700; top: 14px; left: 14px; }
+    
+    .top-center {
+      position: fixed; z-index: 700; top: 14px; left: 50%; transform: translateX(-50%);
+    }
+
+    .tool-stack { position: fixed; z-index: 700; right: 14px; bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
+
+    .status-pill {
+      min-height: 42px; display: flex; align-items: center; justify-content: center;
+      padding: 0 20px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink);
+      background: linear-gradient(90deg, rgba(0,245,255,.16), rgba(5,10,18,.92) 42%, rgba(255,45,111,.14)), var(--panel);
+      box-shadow: var(--shadow); backdrop-filter: blur(18px); white-space: nowrap;
+    }
+    .status-pill strong { font-size: 13px; font-weight: 900; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; }
+
+    .drawer {
+      position: fixed; z-index: 900; top: 12px; left: 12px; bottom: 12px;
+      width: min(390px, calc(100vw - 24px)); display: flex; flex-direction: column;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: linear-gradient(135deg, rgba(0,245,255,.13), transparent 22%), linear-gradient(315deg, rgba(255,45,111,.13), transparent 24%), var(--panel);
+      box-shadow: var(--shadow); backdrop-filter: blur(22px);
+      transform: translateX(calc(-100% - 18px)); transition: transform .22s ease; overflow: hidden;
+      clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px));
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-head { height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 18px; border-bottom: 1px solid var(--line); }
+    .drawer-head strong { font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .drawer-body { overflow: auto; padding: 14px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.24) transparent; }
+
+    .section { padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .section:first-child { padding-top: 0; }
+    .section:last-child { border-bottom: 0; }
+    .section-title {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px;
+      color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+    }
+    .section-title::before { content: ""; width: 18px; height: 2px; background: var(--danger); box-shadow: 0 0 10px var(--danger); }
+
+    .row { min-height: 50px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; }
+    .row + .row { border-top: 1px solid rgba(255,255,255,.08); }
+    .row-main { min-width: 0; }
+    .row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 650; }
+    .row-sub { margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.35; }
+
+    .switch { position: relative; width: 46px; height: 28px; display: inline-block; flex: 0 0 auto; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch span { position: absolute; inset: 0; border-radius: 999px; background: rgba(255,255,255,.18); transition: .18s ease; }
+    .switch span:before { content: ""; position: absolute; left: 4px; top: 4px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: .18s ease; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+    .switch input:checked + span { background: var(--accent); }
+    .switch input:checked + span:before { transform: translateX(18px); }
+
+    .range-row { display: grid; grid-template-columns: minmax(0, 1fr) 42px; gap: 12px; align-items: center; padding: 6px 0 10px; }
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+
+    .btn { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--r); background: linear-gradient(135deg, rgba(0,245,255,.12), rgba(255,45,111,.08)), var(--field); color: var(--ink); font-size: 13px; font-weight: 700; text-decoration: none; }
+    .btn.primary { color: #001015; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; }
+    .btn.blue { color: #041926; background: var(--accent); border-color: transparent; }
+    .btn.warn { color: #241704; background: var(--warn); border-color: transparent; }
+    .btn.full { width: 100%; }
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .file-input { display: none; }
+
+    .metric { position: fixed; z-index: 720; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(120px); min-width: min(310px, calc(100vw - 112px)); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); box-shadow: var(--shadow); backdrop-filter: blur(18px); transition: transform .2s ease; }
+    .metric.show { transform: translateX(-50%) translateY(0); }
+    .metric-value { font-weight: 800; }
+    .metric-label { color: var(--muted); font-size: 12px; }
+
+    .toast { position: fixed; z-index: 1200; left: 50%; top: 70px; max-width: min(460px, calc(100vw - 28px)); transform: translateX(-50%) translateY(-120px); padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); color: var(--ink); background: var(--panel-solid); box-shadow: var(--shadow); font-size: 13px; line-height: 1.35; transition: transform .22s ease; text-align: center;}
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    .popup-title { margin: 0 0 8px; font-weight: 800; }
+    .popup-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .popup-actions .btn { min-height: 34px; padding: 0 10px; }
+    
+    .identify-banner { position: fixed; z-index: 760; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); width: min(620px, calc(100vw - 92px)); transform: translateX(-50%) translateY(140%); border: 1px solid rgba(255,45,111,.65); border-left: 5px solid var(--danger); border-radius: 10px; background: linear-gradient(90deg, rgba(255,45,111,.24), transparent 36%), linear-gradient(180deg, rgba(0,245,255,.14), rgba(5,10,18,.94)), var(--panel-solid); box-shadow: 0 20px 70px rgba(0,0,0,.58), 0 0 30px rgba(255,45,111,.24); backdrop-filter: blur(18px); transition: transform .22s ease; overflow: hidden; }
+    .identify-banner.show { transform: translateX(-50%) translateY(0); }
+    .identify-banner::before { content: "SCAN"; position: absolute; right: 12px; top: 8px; color: rgba(0,245,255,.3); font-size: 10px; font-weight: 900; letter-spacing: .24em; }
+    .identify-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 10px; align-items: center; padding: 13px 12px; }
+    .identify-kv span { display: block; color: var(--muted); font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .identify-kv strong { display: block; margin-top: 3px; color: var(--ink); font-size: 18px; line-height: 1.1; text-shadow: 0 0 14px rgba(0,245,255,.42); }
+    .identify-close { width: 36px; height: 36px; display: grid; place-items: center; color: var(--ink); border: 1px solid rgba(255,255,255,.18); border-radius: 8px; background: rgba(255,255,255,.08); }
+    
+    .survey-marker { width: 36px; height: 36px; display: grid; place-items: center; color: #001015; background: linear-gradient(135deg, #a5ff2f, #00f5ff); border: 2px solid #fff; border-radius: 50% 50% 50% 8px; transform: rotate(-45deg); box-shadow: 0 0 0 4px rgba(0,245,255,.18), 0 0 28px rgba(165,255,47,.75); }
+    .survey-marker .icon { transform: rotate(45deg); font-size: 21px; }
+    .hint { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.42; }
+    .empty { padding: 18px 0; color: var(--muted); font-size: 13px; text-align: center; }
+
+    @media (max-width: 640px) {
+      .top-center { width: auto; }
+      .tool-stack { right: 10px; gap: 9px; }
+      .fab { width: 46px; height: 46px; }
+      .drawer { top: 8px; left: 8px; bottom: 8px; width: calc(100vw - 16px); }
+      .metric { left: 10px; right: 66px; transform: translateY(120px); min-width: 0; }
+      .metric.show { transform: translateY(0); }
+      .identify-banner { left: 10px; right: 66px; width: auto; transform: translateY(140%); }
+      .identify-banner.show { transform: translateY(0); }
+      .identify-body { grid-template-columns: 1fr 1fr auto; }
+      .identify-kv:first-child { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="hud-overlay" aria-hidden="true"></div>
+
+  <div class="top-left">
+    <button class="fab" id="panelBtn" title="Gestione livelli" aria-label="Gestione livelli">
+      <span class="icon">layers</span>
+    </button>
+  </div>
+  
+  <div class="top-center">
+    <div class="status-pill">
+      <strong>App Rilievi</strong>
+    </div>
+  </div>
+
+  <aside class="drawer" id="drawer" aria-label="Gestione livelli">
+    <div class="drawer-head">
+      <strong>Gestione livelli</strong>
+      <button class="fab" id="closeDrawer" title="Chiudi" aria-label="Chiudi" style="width:38px;height:38px;box-shadow:none;">
+        <span class="icon">close</span>
+      </button>
+    </div>
+    <div class="drawer-body">
+      
+      <section class="section">
+        <div class="section-title">Ricerca Particella</div>
+        <div class="row" style="display: flex; flex-direction: column; gap: 10px;">
+          
+          <select id="searchComune" class="btn" style="width: 100%; background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); text-align: left; appearance: auto;">
+            <option value="">Seleziona Comune...</option>
+            <option value="A032">Acquafondata (A032)</option>
+            <option value="A054">Acuto (A054)</option>
+            <option value="A123">Alatri (A123)</option>
+            <option value="A244">Alvito (A244)</option>
+            <option value="A256">Amaseno (A256)</option>
+            <option value="A269">Anagni (A269)</option>
+            <option value="A348">Aquino (A348)</option>
+            <option value="A363">Arce (A363)</option>
+            <option value="A421">Arnara (A421)</option>
+            <option value="A433">Arpino (A433)</option>
+            <option value="A486">Atina (A486)</option>
+            <option value="A502">Ausonia (A502)</option>
+            <option value="A763">Belmonte Castello (A763)</option>
+            <option value="A720">Boville Ernica (A720)</option>
+            <option value="B195">Broccostella (B195)</option>
+            <option value="B543">Campoli Appennino (B543)</option>
+            <option value="B862">Casalattico (B862)</option>
+            <option value="B919">Casalvieri (B919)</option>
+            <option value="C034">Cassino (C034)</option>
+            <option value="C177">Castelliri (C177)</option>
+            <option value="C223">Castelnuovo Parano (C223)</option>
+            <option value="C338">Castro Dei Volsci (C338)</option>
+            <option value="C340">Castrocielo (C340)</option>
+            <option value="C413">Ceccano (C413)</option>
+            <option value="C479">Ceprano (C479)</option>
+            <option value="C545">Cervaro (C545)</option>
+            <option value="C836">Colfelice (C836)</option>
+            <option value="C870">Colle San Magno (C870)</option>
+            <option value="C864">Collepardo (C864)</option>
+            <option value="C998">Coreno Ausonio (C998)</option>
+            <option value="D440">Esperia (D440)</option>
+            <option value="D483">Falvaterra (D483)</option>
+            <option value="D539">Ferentino (D539)</option>
+            <option value="D591">Filettino (D591)</option>
+            <option value="A310">Fiuggi (A310)</option>
+            <option value="D667">Fontana Liri (D667)</option>
+            <option value="D682">Fontechiari (D682)</option>
+            <option value="D810">Frosinone (D810)</option>
+            <option value="D819">Fumone (D819)</option>
+            <option value="D881">Gallinaro (D881)</option>
+            <option value="E057">Giuliano Di Roma (E057)</option>
+            <option value="E236">Guarcino (E236)</option>
+            <option value="E340">Isola Del Liri (E340)</option>
+            <option value="F620">Monte San Giovanni Campano (F620)</option>
+            <option value="F740">Morolo (F740)</option>
+            <option value="G276">Paliano (G276)</option>
+            <option value="G362">Pastena (G362)</option>
+            <option value="G374">Patrica (G374)</option>
+            <option value="G500">Pescosolido (G500)</option>
+            <option value="G591">Picinisco (G591)</option>
+            <option value="G592">Pico (G592)</option>
+            <option value="G598">Piedimonte San Germano (G598)</option>
+            <option value="G659">Piglio (G659)</option>
+            <option value="G662">Pignataro Interamna (G662)</option>
+            <option value="G749">Pofi (G749)</option>
+            <option value="G838">Pontecorvo (G838)</option>
+            <option value="G935">Posta Fibreno (G935)</option>
+            <option value="H324">Ripi (H324)</option>
+            <option value="H393">Roccadarce (H393)</option>
+            <option value="H443">Roccasecca (H443)</option>
+            <option value="H779">San Biagio Saracinisco (H779)</option>
+            <option value="H824">San Donato Val Di Comino (H824)</option>
+            <option value="H880">San Giorgio A Liri (H880)</option>
+            <option value="H917">San Giovanni Incarico (H917)</option>
+            <option value="I408">San Vittore Del Lazio (I408)</option>
+            <option value="I256">Sant'Ambrogio Sul Garigliano (I256)</option>
+            <option value="I265">Sant'Andrea Del Garigliano (I265)</option>
+            <option value="I302">Sant'Apollinare (I302)</option>
+            <option value="I321">Sant'Elia Fiumerapido (I321)</option>
+            <option value="I351">Santopadre (I351)</option>
+            <option value="I669">Serrone (I669)</option>
+            <option value="I697">Settefrati (I697)</option>
+            <option value="I716">Sgurgola (I716)</option>
+            <option value="I838">Sora (I838)</option>
+            <option value="I973">Strangolagalli (I973)</option>
+            <option value="L009">Supino (L009)</option>
+            <option value="L105">Terelle (L105)</option>
+            <option value="L243">Torre Cajetani (L243)</option>
+            <option value="L290">Torrice (L290)</option>
+            <option value="L398">Trevi Nel Lazio (L398)</option>
+            <option value="L437">Trivigliano (L437)</option>
+            <option value="L598">Vallecorsa (L598)</option>
+            <option value="L605">Vallemaio (L605)</option>
+            <option value="L614">Vallerotonda (L614)</option>
+            <option value="L780">Veroli (L780)</option>
+            <option value="L836">Vicalvi (L836)</option>
+            <option value="L843">Vico Nel Lazio (L843)</option>
+            <option value="A081">Villa Latina (A081)</option>
+            <option value="L905">Villa Santa Lucia (L905)</option>
+            <option value="I364">Villa Santo Stefano (I364)</option>
+            <option value="M083">Viticuso (M083)</option>
+          </select>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <input id="searchFoglio" type="number" placeholder="Foglio" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
+            <input id="searchParticella" type="text" placeholder="Particella" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
+          </div>
+          
+          <button class="btn primary full" id="btnSearchParcel">
+            <span class="icon">travel_explore</span> Centra Particella su Mappa
+          </button>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Ordine livelli</div>
+        <div class="row">
+          <div class="row-main">
+            <div class="row-title">Numeri particelle</div>
+            <div class="row-sub">Giallo cantiere, dimensione 1.5x</div>
+          </div>
+          <label class="switch" title="Mostra/nascondi numeri particelle">
+            <input id="toggleLabels" type="checkbox" checked>
+            <span></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="row-main">
+            <div class="row-title">Fabbricati</div>
+            <div class="row-sub">Sagome catastali in rosso scuro</div>
+          </div>
+          <label class="switch" title="Mostra/nascondi fabbricati">
+            <input id="toggleBuildings" type="checkbox" checked>
+            <span></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="row-main">
+            <div class="row-title">Particelle</div>
+            <div class="row-sub">Confini catastali in bianco, zoom 16+</div>
+          </div>
+          <label class="switch" title="Mostra/nascondi particelle">
+            <input id="toggleParcels" type="checkbox" checked>
+            <span></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="row-main">
+            <div class="row-title">Satellite Google</div>
+            <div class="row-sub">Ortofoto ad alta risoluzione</div>
+          </div>
+          <label class="switch" title="Mostra/nascondi Google Satellite">
+            <input id="toggleGoogle" type="checkbox" checked>
+            <span></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="row-main">
+            <div class="row-title">Satellite Bing</div>
+            <div class="row-sub">Immagini Microsoft/Bing</div>
+          </div>
+          <label class="switch" title="Mostra/nascondi Bing Satellite">
+            <input id="toggleBing" type="checkbox">
+            <span></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="row-main">
+            <div class="row-title">Ortofoto AGEA 2012</div>
+            <div class="row-sub">Geoportale nazionale, copertura Lazio</div>
+          </div>
+          <label class="switch" title="Mostra/nascondi Ortofoto AGEA">
+            <input id="toggleAgea" type="checkbox">
+            <span></span>
+          </label>
+        </div>
+        <div class="range-row">
+          <input id="catastoOpacity" type="range" min="0" max="1" step="0.05" value="0.78" aria-label="Opacita catasto">
+          <strong id="opacityValue">78%</strong>
+        </div>
+        <button class="btn full" id="goFrosinone"><span class="icon">center_focus_strong</span> Zona test catasto</button>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Rilievi importati</div>
+        <label class="btn primary full">
+          <span class="icon">upload_file</span>
+          Importa rilievo KML / GeoJSON
+          <input class="file-input" id="fileInput" type="file" accept=".kml,.geojson,.json" multiple>
+        </label>
+        <div id="importedLayers"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Offline Area KML</div>
+        <div class="btn-grid">
+          <button class="btn blue" id="saveOffline"><span class="icon">download</span> Salva per rilievo</button>
+          <button class="btn warn" id="loadOffline"><span class="icon">cloud_off</span> Ricarica offline</button>
+        </div>
+        <p class="hint">Calcola l'area di tutti i KML importati e scarica mappa catastale e satellitare in alta definizione per uso senza internet sul campo.</p>
+        <div id="offlineInfo" class="hint"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Strumenti</div>
+        <div class="row">
+          <div class="row-main">
+            <div class="row-title">Misura distanza</div>
+            <div class="row-sub">Tocca la mappa per aggiungere punti</div>
+          </div>
+          <label class="switch" title="Misura distanza">
+            <input id="toggleMeasure" type="checkbox">
+            <span></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="row-main">
+            <div class="row-title">Interroga particella</div>
+            <div class="row-sub">Tieni premuto sulla mappa o usa click destro</div>
+          </div>
+          <label class="switch" title="Interroga catasto">
+            <input id="toggleIdentify" type="checkbox" checked>
+            <span></span>
+          </label>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <div class="tool-stack">
+    <button class="fab" id="gpsBtn" title="La mia posizione" aria-label="La mia posizione"><span class="icon">my_location</span></button>
+    <button class="fab" id="measureBtn" title="Misura distanza" aria-label="Misura distanza"><span class="icon">straighten</span></button>
+    <button class="fab" id="identifyBtn" title="Interroga catasto" aria-label="Interroga catasto"><span class="icon">travel_explore</span></button>
+  </div>
+
+  <div class="metric" id="metric">
+    <div>
+      <div class="metric-label">Distanza totale</div>
+      <div class="metric-value" id="metricValue">0 m</div>
+    </div>
+    <button class="btn" id="clearMeasure"><span class="icon">delete</span> Pulisci</button>
+  </div>
+
+  <div class="identify-banner" id="identifyBanner" aria-live="polite">
+    <div class="identify-body">
+      <div class="identify-kv"><span>Comune</span><strong id="idComune">-</strong></div>
+      <div class="identify-kv"><span>Foglio</span><strong id="idFoglio">-</strong></div>
+      <div class="identify-kv"><span>Particella</span><strong id="idParticella">-</strong></div>
+      <button class="identify-close" id="closeIdentify" title="Chiudi" aria-label="Chiudi">
+        <span class="icon">close</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const WMS_URL = "https://wms.cartografia.agenziaentrate.gov.it/inspire/wms/ows01.php";
+    const PCN_AGEA_URL = "https://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_12.map";
+    const CATASTO_CRS = L.extend({}, L.CRS.EPSG4326, { code: "EPSG:4258" });
+    const CATASTO_TILE_SIZE = 512;
+    const STORAGE_KEY = "georilievo_pro_state_v3";
+    const TILE_CACHE = "georilievo-pro-tiles-v2";
+
+    const state = {
+      imported: new Map(),
+      nextLayerId: 1,
+      measuring: false,
+      identify: true,
+      measurePoints: [],
+      measureMarkers: [],
+      measureLine: null,
+      userMarker: null,
+      pressTimer: null,
+      lastPressLatLng: null
+    };
+
+    const el = {
+      drawer: document.getElementById("drawer"),
+      panelBtn: document.getElementById("panelBtn"),
+      closeDrawer: document.getElementById("closeDrawer"),
+      toggleGoogle: document.getElementById("toggleGoogle"),
+      toggleBing: document.getElementById("toggleBing"),
+      toggleAgea: document.getElementById("toggleAgea"),
+      toggleParcels: document.getElementById("toggleParcels"),
+      toggleBuildings: document.getElementById("toggleBuildings"),
+      toggleLabels: document.getElementById("toggleLabels"),
+      catastoOpacity: document.getElementById("catastoOpacity"),
+      opacityValue: document.getElementById("opacityValue"),
+      fileInput: document.getElementById("fileInput"),
+      importedLayers: document.getElementById("importedLayers"),
+      gpsBtn: document.getElementById("gpsBtn"),
+      measureBtn: document.getElementById("measureBtn"),
+      identifyBtn: document.getElementById("identifyBtn"),
+      toggleMeasure: document.getElementById("toggleMeasure"),
+      toggleIdentify: document.getElementById("toggleIdentify"),
+      metric: document.getElementById("metric"),
+      metricValue: document.getElementById("metricValue"),
+      clearMeasure: document.getElementById("clearMeasure"),
+      toast: document.getElementById("toast"),
+      goFrosinone: document.getElementById("goFrosinone"),
+      saveOffline: document.getElementById("saveOffline"),
+      loadOffline: document.getElementById("loadOffline"),
+      offlineInfo: document.getElementById("offlineInfo"),
+      identifyBanner: document.getElementById("identifyBanner"),
+      idComune: document.getElementById("idComune"),
+      idFoglio: document.getElementById("idFoglio"),
+      idParticella: document.getElementById("idParticella"),
+      closeIdentify: document.getElementById("closeIdentify"),
+      
+      // Nuovi elementi ricerca
+      searchComune: document.getElementById("searchComune"),
+      searchFoglio: document.getElementById("searchFoglio"),
+      searchParticella: document.getElementById("searchParticella"),
+      btnSearchParcel: document.getElementById("btnSearchParcel")
+    };
+
+    const map = L.map("map", {
+      zoomControl: false,
+      doubleClickZoom: false,
+      preferCanvas: true,
+      zoomSnap: 0.25
+    }).setView([41.639, 13.341], 18);
+
+    L.control.zoom({ position: "topright" }).addTo(map);
+    
+    [
+      ["ageaPane", 180],
+      ["bingPane", 190],
+      ["googlePane", 200],
+      ["parcelPane", 420],
+      ["buildingPane", 440],
+      ["labelPane", 470]
+    ].forEach(([name, zIndex]) => {
+      map.createPane(name);
+      map.getPane(name).style.zIndex = zIndex;
+    });
+
+    const BingSatellite = L.TileLayer.extend({
+      getTileUrl(coords) {
+        const quadKey = this.toQuadKey(coords.x, coords.y, coords.z);
+        const subdomain = this.options.subdomains[Math.abs(coords.x + coords.y) % this.options.subdomains.length];
+        return `https://ecn.t${subdomain}.tiles.virtualearth.net/tiles/a${quadKey}.jpeg?g=13239&n=z`;
+      },
+      toQuadKey(x, y, z) {
+        let quadKey = "";
+        for (let i = z; i > 0; i--) {
+          let digit = 0;
+          const mask = 1 << (i - 1);
+          if ((x & mask) !== 0) digit += 1;
+          if ((y & mask) !== 0) digit += 2;
+          quadKey += digit;
+        }
+        return quadKey;
+      }
+    });
+
+    const googleSat = L.tileLayer("https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
+      maxZoom: 22,
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+      pane: "googlePane",
+      attribution: "Google Satellite"
+    }).addTo(map);
+
+    const bingSat = new BingSatellite("", { maxZoom: 22, subdomains: ["0", "1", "2", "3"], pane: "bingPane" });
+
+    const ageaOrtofoto = L.tileLayer.wms(PCN_AGEA_URL, {
+      layers: "OI.ORTOIMMAGINI.2012.33", format: "image/jpeg", transparent: false, version: "1.3.0",
+      crs: L.CRS.EPSG3857, maxZoom: 22, pane: "ageaPane", tileSize: 512, updateWhenIdle: true
+    });
+
+    function polygonSld(layerName, stroke, fill, fillOpacity, strokeWidth) {
+      return `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><NamedLayer><Name>${layerName}</Name><UserStyle><FeatureTypeStyle><Rule><PolygonSymbolizer><Fill><CssParameter name="fill">${fill}</CssParameter><CssParameter name="fill-opacity">${fillOpacity}</CssParameter></Fill><Stroke><CssParameter name="stroke">${stroke}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></PolygonSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
+    }
+
+    function labelSld() {
+      return `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>codice_plla</Name><UserStyle><FeatureTypeStyle><Rule><MinScaleDenominator>20</MinScaleDenominator><MaxScaleDenominator>4000</MaxScaleDenominator><TextSymbolizer><Label><ogc:PropertyName>TESTO</ogc:PropertyName></Label><Font><CssParameter name="font-family">courier</CssParameter><CssParameter name="font-size">14</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>1.0</AnchorPointX><AnchorPointY>1.0</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Fill><CssParameter name="fill">#ffcc33</CssParameter></Fill></TextSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
+    }
+
+    function makeCadastreLayer(layerName, sldBody, pane) {
+      return L.tileLayer.wms(WMS_URL, {
+        layers: layerName, styles: "", format: "image/png", transparent: true, version: "1.1.1",
+        crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 16, maxZoom: 22,
+        uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane, sld_body: sldBody
+      });
+    }
+
+    const parcelsLayer = makeCadastreLayer("CP.CadastralParcel", polygonSld("CP.CadastralParcel", "#ffffff", "#ffffff", "0", "1.5"), "parcelPane").addTo(map);
+    const buildingsLayer = makeCadastreLayer("fabbricati", polygonSld("fabbricati", "#7b1118", "#7b1118", "0.34", "2.2"), "buildingPane").addTo(map);
+    const labelsLayer = L.tileLayer.wms(WMS_URL, {
+      layers: "codice_plla", styles: "", format: "image/png", transparent: true, version: "1.1.1",
+      crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 18, maxZoom: 22,
+      uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane: "labelPane", sld_body: labelSld()
+    }).addTo(map);
+
+    const cadastreLayers = [parcelsLayer, buildingsLayer, labelsLayer];
+    let catastoTileErrors = 0;
+    cadastreLayers.forEach(layer => {
+      layer.on("tileerror", () => {
+        catastoTileErrors += 1;
+        if (catastoTileErrors > 2) console.warn("WMS irraggiungibile");
+      });
+    });
+
+    const measureLayer = L.featureGroup().addTo(map);
+
+    function toast(message, ms = 2600) {
+      el.toast.textContent = message;
+      el.toast.classList.add("show");
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => el.toast.classList.remove("show"), ms);
+    }
+
+    function setLayer(layer, visible) {
+      if (visible && !map.hasLayer(layer)) map.addLayer(layer);
+      if (!visible && map.hasLayer(layer)) map.removeLayer(layer);
+    }
+
+    function setMeasureMode(active) {
+      state.measuring = active;
+      el.measureBtn.classList.toggle("active", active);
+      el.toggleMeasure.checked = active;
+      el.metric.classList.toggle("show", active || state.measurePoints.length > 0);
+      map.getContainer().style.cursor = active ? "crosshair" : "";
+      if (active) toast("Misura attiva. Tocca la mappa per aggiungere punti.");
+    }
+
+    function setIdentifyMode(active) {
+      state.identify = active;
+      el.identifyBtn.classList.toggle("active", active);
+      el.toggleIdentify.checked = active;
+      if (active) toast("Interrogazione catasto attiva: tieni premuto su una particella.");
+    }
+
+    function refreshMeasure() {
+      measureLayer.clearLayers();
+      let total = 0;
+      state.measurePoints.forEach((latlng, index) => {
+        if (index > 0) total += state.measurePoints[index - 1].distanceTo(latlng);
+        L.circleMarker(latlng, { radius: 5, color: "#fff", weight: 2, fillColor: "#ffbe55", fillOpacity: 1 }).addTo(measureLayer);
+      });
+      if (state.measurePoints.length > 1) {
+        L.polyline(state.measurePoints, { color: "#ffbe55", weight: 3, dashArray: "8 8" }).addTo(measureLayer);
+      }
+      el.metricValue.textContent = (total >= 1000) ? `${(total / 1000).toFixed(2)} km` : `${total.toFixed(total >= 100 ? 0 : 1)} m`;
+      el.metric.classList.toggle("show", state.measuring || state.measurePoints.length > 0);
+    }
+
+    function clearMeasure() { state.measurePoints = []; refreshMeasure(); }
+    
+    function escapeHtml(v) {
+      const mapStr = { "&": "&", "<": "<", ">": ">", '"': "\"", "'": "'" };
+      return String(v ?? "").replace(/[&<>"']/g, c => mapStr[c]);
+    }
+
+    function featureStyle() { return { color: "#a5ff2f", weight: 5, opacity: .98, fillColor: "#00f5ff", fillOpacity: .16, dashArray: "12 8" }; }
+    function pointStyle(f, latlng) { return L.marker(latlng, { icon: L.divIcon({ className: "survey-marker-wrap", html: `<div class="survey-marker"><span class="icon">flag</span></div>`, iconSize: [36, 36], iconAnchor: [18, 34], popupAnchor: [0, -30] }) }); }
+
+    function featureStartCoordinate(geometry) {
+      if (!geometry) return null;
+      let coords = geometry.coordinates;
+      while (Array.isArray(coords) && Array.isArray(coords[0])) coords = coords[0];
+      if (!Array.isArray(coords) || coords.length < 2) return null;
+      return { lng: Number(coords[0]), lat: Number(coords[1]) };
+    }
+
+    function bindFeaturePopup(feature, layer) {
+      const name = feature?.properties?.name || "Punto rilievo";
+      let html = `<div class="popup-title">${escapeHtml(name)}</div><div class="popup-actions">`;
+      const start = featureStartCoordinate(feature.geometry);
+      if (start) {
+         html += `<a class="btn blue" href="https://maps.google.com/?q=${start.lat},${start.lng}" target="_blank"><span class="icon">navigation</span> Google Maps</a>`;
+      }
+      html += `</div>`;
+      layer.bindPopup(html);
+    }
+
+    function addImportedLayer(name, geojson, visible = true) {
+      const id = `rilievo_${state.nextLayerId++}`;
+      const layer = L.geoJSON(geojson, { style: featureStyle, pointToLayer: pointStyle, onEachFeature: bindFeaturePopup });
+      state.imported.set(id, { id, name, geojson, layer, visible });
+      if (visible) layer.addTo(map);
+      renderImportedLayers();
+      try { if(layer.getBounds().isValid()) map.fitBounds(layer.getBounds(), { padding: [28, 28], maxZoom: 19 }); } catch(e){}
+      return id;
+    }
+
+    function renderImportedLayers() {
+      el.importedLayers.innerHTML = "";
+      if (!state.imported.size) { el.importedLayers.innerHTML = `<div class="empty">Nessun rilievo caricato</div>`; return; }
+      for (const item of state.imported.values()) {
+        const c = item.geojson.type === "FeatureCollection" ? item.geojson.features.length : 1;
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = `
+          <div class="row-main">
+            <div class="row-title" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+            <div class="row-sub">${c} elementi</div>
+          </div>
+          <label class="switch" title="Mostra/nascondi ${escapeHtml(item.name)}">
+            <input type="checkbox" ${item.visible ? "checked" : ""} data-layer-id="${item.id}"><span></span>
+          </label>`;
+        el.importedLayers.appendChild(row);
+      }
+    }
+
+    async function importFiles(files) {
+      for (const file of files) {
+        try {
+          const content = await file.text();
+          if (file.name.toLowerCase().endsWith(".kml")) {
+             const parser = new DOMParser();
+             const xml = parser.parseFromString(content, "text/xml");
+             const folders = xml.querySelectorAll("Folder");
+             if(folders.length > 0) {
+                 const serializer = new XMLSerializer();
+                 folders.forEach((folder, idx) => {
+                     const nameNode = folder.querySelector("name");
+                     const fName = nameNode ? nameNode.textContent : `Livello ${idx+1}`;
+                     const kmlString = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>${serializer.serializeToString(folder)}</Document></kml>`;
+                     const geojson = omnivore.kml.parse(kmlString).toGeoJSON();
+                     if(geojson.features && geojson.features.length > 0) {
+                         addImportedLayer(`${file.name} - ${fName}`, geojson, true);
+                     }
+                 });
+             } else {
+                 addImportedLayer(file.name, omnivore.kml.parse(content).toGeoJSON(), true);
+             }
+          } else {
+             addImportedLayer(file.name, JSON.parse(content), true);
+          }
+          toast(`${file.name} caricato.`);
+        } catch (error) {
+          toast(`Non riesco a leggere ${file.name}.`);
+        }
+      }
+      el.fileInput.value = "";
+    }
+
+    function showIdentifyBanner(data) {
+      el.idComune.textContent = data.comune || "-"; el.idFoglio.textContent = data.foglio || "-"; el.idParticella.textContent = data.particella || "-";
+      el.identifyBanner.classList.add("show");
+    }
+
+    async function fetchFeatureInfoText(url) {
+      const proxyUrl = `/api/wms-proxy?url=${encodeURIComponent(url)}`;
+      try {
+        const res = await fetch(proxyUrl);
+        if (res.ok) return await res.text();
+        throw new Error("Proxy risposto con stato " + res.status);
+      } catch (err) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) return await res.text();
+          throw new Error("Fetch diretto fallito");
+        } catch (err2) {
+          throw new Error("Servizio catastale non raggiungibile: " + err2.message);
+        }
+      }
+    }
+
+    async function identifyParcel(latlng) {
+      if (!state.identify || state.measuring) return;
+      if (map.getZoom() < 16) { toast("Il Catasto risponde solo a scale alte. Porta lo zoom almeno a 16."); return; }
+      toast("Interrogo il Catasto...");
+      const meters = Math.max(1.5, 22 - map.getZoom());
+      const latD = meters / 111320; 
+      const lngD = meters / (111320 * Math.max(.25, Math.cos(latlng.lat * Math.PI / 180)));
+      const bbox = [latlng.lng - lngD, latlng.lat - latD, latlng.lng + lngD, latlng.lat + latD].join(",");
+      const url = `${WMS_URL}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo&LAYERS=CP.CadastralParcel&QUERY_LAYERS=CP.CadastralParcel&STYLES=&SRS=EPSG:4258&BBOX=${bbox}&WIDTH=9&HEIGHT=9&X=5&Y=5&FEATURE_COUNT=10&INFO_FORMAT=text/html`;
+      
+      try {
+        let text = await fetchFeatureInfoText(url);
+        text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        const f = text.match(/(?:FOGLIO|Foglio)\s*[:=]?\s*([A-Za-z0-9]+)/);
+        const p = text.match(/(?:PARTICELLA|Particella)\s*[:=]?\s*([A-Za-z0-9/]+)/);
+        const ref = text.match(/NationalCadastralReference\s+([A-Z0-9]+)_([A-Z0-9]+)\.([A-Z0-9/]+)/i);
+        
+        if (f || p || ref) {
+            showIdentifyBanner({ comune: ref?.[1] || "-", foglio: f?.[1] || ref?.[2] || "-", particella: p?.[1] || ref?.[3] || "-" });
+            toast("Dati particella recuperati.");
+        } else { 
+            toast("Nessuna particella trovata in questo punto."); 
+        }
+      } catch (error) {
+         showIdentifyBanner({ comune: "Errore", foglio: "-", particella: "-" });
+         toast("Impossibile recuperare i dati: server catastale bloccato o irraggiungibile.");
+      }
+    }
+
+    function geolocate() {
+      if (location.protocol === 'file:' || location.protocol === 'content:') {
+        toast("ATTENZIONE: Android blocca il GPS in locale. Carica l'app su internet o usa un Server HTTP.", 6000);
+        return;
+      }
+      el.gpsBtn.classList.add("active");
+      toast("Cerco la posizione GPS...");
+      map.locate({ setView: true, maxZoom: 19, enableHighAccuracy: true, timeout: 12000 });
+    }
+
+    function serializeState() {
+      return {
+        savedAt: new Date().toISOString(), center: map.getCenter(), zoom: map.getZoom(),
+        catastoOpacity: Number(el.catastoOpacity.value),
+        imported: Array.from(state.imported.values()).map(item => ({ name: item.name, geojson: item.geojson, visible: item.visible }))
+      };
+    }
+
+    function restoreState(saved) {
+      if (!saved) return;
+      for (const item of state.imported.values()) map.removeLayer(item.layer);
+      state.imported.clear(); state.nextLayerId = 1;
+      map.setView([saved.center.lat, saved.center.lng], saved.zoom);
+      el.catastoOpacity.value = saved.catastoOpacity ?? .78;
+      cadastreLayers.forEach(layer => layer.setOpacity(Number(el.catastoOpacity.value)));
+      (saved.imported || []).forEach(item => addImportedLayer(item.name, item.geojson, item.visible !== false));
+      el.offlineInfo.textContent = saved.savedAt ? `Aree KML salvate: ${new Date(saved.savedAt).toLocaleString("it-IT")}` : "";
+    }
+
+    async function saveOffline() {
+      let allBounds = L.latLngBounds();
+      for (const item of state.imported.values()) {
+         try { if(item.layer.getBounds().isValid()) allBounds.extend(item.layer.getBounds()); } catch(e){}
+      }
+      if (!allBounds.isValid()) { toast("Devi prima importare un KML per definire l'area da scaricare offline."); return; }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState()));
+      toast("Calcolo mappe satellitari e catastali area KML in corso...", 4000);
+      
+      let cached = 0;
+      if ("caches" in window) {
+        try {
+          const cache = await caches.open(TILE_CACHE);
+          const zooms = [17, 18]; 
+          
+          for (const z of zooms) {
+             const minG = map.project(allBounds.getNorthWest(), z).divideBy(256).floor();
+             const maxG = map.project(allBounds.getSouthEast(), z).divideBy(256).floor();
+             for(let x = minG.x; x <= maxG.x; x++) {
+                 for(let y = minG.y; y <= maxG.y; y++) {
+                     if(cached > 1200) break;
+                     const sub = ["mt0", "mt1", "mt2", "mt3"][Math.abs(x + y) % 4];
+                     const gUrl = `https://${sub}.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
+                     try { await cache.add(new Request(gUrl, {mode:'no-cors'})); cached++; } catch(e){}
+                 }
+             }
+             
+             const minC = map.project(allBounds.getNorthWest(), z).divideBy(512).floor();
+             const maxC = map.project(allBounds.getSouthEast(), z).divideBy(512).floor();
+             for(let x = minC.x; x <= maxC.x; x++) {
+                 for(let y = minC.y; y <= maxC.y; y++) {
+                     if(cached > 1200) break;
+                     const cUrl = parcelsLayer.getTileUrl({x: x, y: y, z: z});
+                     try { await cache.add(new Request(cUrl, {mode:'no-cors'})); cached++; } catch(e){}
+                 }
+             }
+          }
+        } catch(e) { console.warn(e); }
+      }
+      
+      el.offlineInfo.textContent = `Aree KML salvate: ${new Date().toLocaleString("it-IT")}. Tile in cache: ${cached}.`;
+      toast(cached ? `Area rilievo salvata! ${cached} tasselli mappa memorizzati offline.` : "Errore salvataggio file mappa offline.");
+    }
+
+    el.panelBtn.addEventListener("click", () => el.drawer.classList.add("open"));
+    el.closeDrawer.addEventListener("click", () => el.drawer.classList.remove("open"));
+    el.closeIdentify.addEventListener("click", () => el.identifyBanner.classList.remove("show"));
+    el.toggleGoogle.addEventListener("change", e => setLayer(googleSat, e.target.checked));
+    el.toggleBing.addEventListener("change", e => setLayer(bingSat, e.target.checked));
+    el.toggleAgea.addEventListener("change", e => setLayer(ageaOrtofoto, e.target.checked));
+    el.toggleParcels.addEventListener("change", e => setLayer(parcelsLayer, e.target.checked));
+    el.toggleBuildings.addEventListener("change", e => setLayer(buildingsLayer, e.target.checked));
+    el.toggleLabels.addEventListener("change", e => setLayer(labelsLayer, e.target.checked));
+    el.catastoOpacity.addEventListener("input", e => {
+      const v = Number(e.target.value); cadastreLayers.forEach(l => l.setOpacity(v)); el.opacityValue.textContent = `${Math.round(v * 100)}%`;
+    });
+    el.goFrosinone.addEventListener("click", () => map.setView([41.639, 13.341], 18));
+    el.fileInput.addEventListener("change", e => importFiles(e.target.files));
+    el.importedLayers.addEventListener("change", e => {
+      const id = e.target.dataset.layerId; if (!id) return;
+      const item = state.imported.get(id); if (item) { item.visible = e.target.checked; setLayer(item.layer, item.visible); }
+    });
+    el.gpsBtn.addEventListener("click", geolocate);
+    el.measureBtn.addEventListener("click", () => setMeasureMode(!state.measuring));
+    el.toggleMeasure.addEventListener("change", e => setMeasureMode(e.target.checked));
+    el.identifyBtn.addEventListener("click", () => setIdentifyMode(!state.identify));
+    el.toggleIdentify.addEventListener("change", e => setIdentifyMode(e.target.checked));
+    el.clearMeasure.addEventListener("click", clearMeasure);
+    el.saveOffline.addEventListener("click", saveOffline);
+    el.loadOffline.addEventListener("click", () => {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) { restoreState(JSON.parse(raw)); toast("Aree rilievo offline ricaricate."); } else toast("Nessun dato salvato.");
+    });
+
+    map.on("click", e => { if (state.measuring) { state.measurePoints.push(e.latlng); refreshMeasure(); } });
+    map.on("contextmenu", e => identifyParcel(e.latlng));
+    map.on("mousedown touchstart", e => {
+      state.lastPressLatLng = e.latlng; clearTimeout(state.pressTimer);
+      state.pressTimer = setTimeout(() => identifyParcel(state.lastPressLatLng), 720);
+    });
+    map.on("mouseup touchend dragstart zoomstart move", () => clearTimeout(state.pressTimer));
+    map.on("locationfound", e => {
+      el.gpsBtn.classList.remove("active");
+      if (state.userMarker) map.removeLayer(state.userMarker);
+      state.userMarker = L.circleMarker(e.latlng, { radius: 8, color: "#fff", weight: 3, fillColor: "#26d3a6", fillOpacity: 1 }).addTo(map).bindPopup("La tua posizione");
+      L.circle(e.latlng, { radius: e.accuracy || 20, color: "#26d3a6", weight: 1, fillColor: "#26d3a6", fillOpacity: .08 }).addTo(map);
+    });
+    map.on("locationerror", () => { el.gpsBtn.classList.remove("active"); toast("GPS non disponibile."); });
+
+    let searchedParcelMarker = null;
+
+    el.btnSearchParcel.addEventListener("click", async () => {
+      const comune = el.searchComune.value;
+      const foglio = el.searchFoglio.value.trim();
+      const particella = el.searchParticella.value.trim();
+
+      if (!comune || !foglio || !particella) {
+        toast("Seleziona il comune e inserisci foglio e particella.");
+        return;
+      }
+
+      toast("Ricerca coordinate in corso...");
+
+      try {
+        // ===========================================================================
+        // ATTENZIONE: INSERISCI QUI LA CHIAMATA ALLA TUA API DI GEOCODING
+        // Poiché il WMS dell'Agenzia delle Entrate non supporta la ricerca inversa, 
+        // devi interrogare un tuo backend o un servizio API per convertire i dati.
+        // ===========================================================================
+        
+        /* ESEMPIO DI CHIAMATA REALE A UN TUO BACKEND:
+        const url = `https://api.tuosito.it/geocoder?comune=${comune}&foglio=${foglio}&particella=${particella}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Particella non trovata nel database.");
+        const data = await res.json();
+        const lat = data.latitudine;
+        const lng = data.longitudine;
+        */
+
+        // Simulazione di una ricerca fallita senza backend collegato
+        throw new Error("Collega un'API di Geocoding per risolvere le coordinate.");
+
+        // === QUANDO AVRAI LE COORDINATE (es. lat e lng), SCOMMENTA QUESTO BLOCCO ===
+        /*
+        // 1. Rimuovi il marker precedente se esiste
+        if (searchedParcelMarker) map.removeLayer(searchedParcelMarker);
+
+        // 2. Centra la mappa con un bello zoom sulla particella
+        map.setView([lat, lng], 20, { animate: true, duration: 1.5 });
+
+        // 3. Aggiungi un marker colorato e pulsante al centro
+        searchedParcelMarker = L.circleMarker([lat, lng], { 
+          radius: 12, 
+          color: "#fff", 
+          weight: 2, 
+          fillColor: "#ff2d6f", 
+          fillOpacity: 0.8 
+        }).addTo(map);
+
+        searchedParcelMarker.bindPopup(`<div class="popup-title">Particella ${particella}</div><div class="row-sub">Foglio ${foglio}</div>`).openPopup();
+        
+        // 4. Chiudi il drawer per lasciar vedere la mappa
+        el.drawer.classList.remove("open");
+        toast(`Mappa centrata sulla particella ${particella}!`);
+        */
+
+      } catch (err) {
+        toast(err.message, 4000);
+        console.warn("Manca l'endpoint di geocoding inverso. Il WMS dell'AdE accetta solo click (GetFeatureInfo) e non query testuali sui server pubblici.");
+      }
+    });
+
+    setIdentifyMode(true);
+  </script>
+</body>
+</html>
