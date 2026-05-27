@@ -991,6 +991,7 @@
           .setContent(`
             <div class="popup-title" style="color: #ff2d6f; font-weight:800; margin-bottom:4px;">Particella Individuata</div>
             <div class="row-sub">Comune: ${escapeHtml(comune)}<br>Foglio: ${escapeHtml(foglio)}<br>Particella: ${escapeHtml(particella)}</div>
+            <div class="popup-actions"><a class="btn blue" href="https://maps.google.com/?q=${data.centro[0]},${data.centro[1]}" target="_blank"><span class="icon">navigation</span> Google Maps</a></div>
           `)
           .openOn(map);
 
