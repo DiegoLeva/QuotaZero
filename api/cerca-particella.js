@@ -24,13 +24,9 @@ export default async function handler(req, res) {
     const part = particella.trim().replace(/^0+/, '');
     const codComune = comune.toUpperCase().trim();
 
-    // LA QUERY POSTGIS: 
-    // ST_AsGeoJSON converte la geometria spaziale in JSON comprensibile da Leaflet
-    // ST_Y e ST_X calcolano il punto centrale (centroide) del poligono per spostare la mappa
     const query = `
-      SELECT 
-        ST_AsGeoJSON(geometry) as geojson,
-        ST_Y(ST_Centroid(geometry)) as centro_lat, 
+      SELECT
+        ST_Y(ST_Centroid(geometry)) as centro_lat,
         ST_X(ST_Centroid(geometry)) as centro_lng
       FROM particelle_catastali
       WHERE (UPPER(comune) = $1)
@@ -38,7 +34,7 @@ export default async function handler(req, res) {
         AND (particella = $4)
       LIMIT 1;
     `;
-    
+
     const result = await pool.query(query, [codComune, fgl, foglio.trim(), part]);
 
     if (result.rows.length === 0) {
@@ -47,10 +43,8 @@ export default async function handler(req, res) {
 
     const row = result.rows[0];
 
-    // Risposta JSON strutturata
     return res.status(200).json({
-      centro: [parseFloat(row.centro_lat), parseFloat(row.centro_lng)],
-      geometria: JSON.parse(row.geojson) 
+      centro: [parseFloat(row.centro_lat), parseFloat(row.centro_lng)]
     });
 
   } catch (error) {

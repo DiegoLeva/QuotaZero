@@ -703,7 +703,7 @@
     function clearMeasure() { state.measurePoints = []; refreshMeasure(); }
     
     function escapeHtml(v) {
-      const mapStr = { "&": "&", "<": "<", ">": ">", '"': "\"", "'": "'" };
+      const mapStr = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
       return String(v ?? "").replace(/[&<>"']/g, c => mapStr[c]);
     }
 
@@ -961,10 +961,7 @@
     });
     map.on("locationerror", () => { el.gpsBtn.classList.remove("active"); toast("GPS non disponibile."); });
 
-    let searchedParcelMarker = null;
-    let searchedParcelLayer = null; // Terrà traccia della sagoma della particella
-    
-el.btnSearchParcel.addEventListener("click", async () => {
+    el.btnSearchParcel.addEventListener("click", async () => {
       const comune = el.searchComune.value;
       const foglio = el.searchFoglio.value.trim();
       const particella = el.searchParticella.value.trim();
@@ -974,53 +971,36 @@ el.btnSearchParcel.addEventListener("click", async () => {
         return;
       }
 
-      // Mostra il loader HUD nativo della tua app
       el.loader.classList.add("active");
       toast("Interrogazione database geospaziale...");
 
       try {
-        // Chiamata all'endpoint relativo di Vercel
         const url = `/api/cerca-particella?comune=${encodeURIComponent(comune)}&foglio=${encodeURIComponent(foglio)}&particella=${encodeURIComponent(particella)}`;
-        
+
         const res = await fetch(url);
         const data = await res.json();
-        
+
         if (!res.ok) {
           throw new Error(data.error || "Impossibile trovare la particella.");
         }
 
-        // 1. Rimuovi eventuali poligoni o marker di ricerche precedenti
-        if (searchedParcelLayer) map.removeLayer(searchedParcelLayer);
-        if (searchedParcelMarker) map.removeLayer(searchedParcelMarker);
-
-        // 2. Centra la mappa sulle coordinate del centroide restituite da PostGIS
         map.setView(data.centro, 19.5, { animate: true, duration: 1.5 });
 
-        // 3. Disegna i confini reali geometrici estratti dal tuo file GML/GeoJSON
-        searchedParcelLayer = L.geoJSON(data.geometria, {
-          style: {
-            color: "#ff2d6f",       // Colore Rosa Neon coerente con il tuo stile HUD (--danger)
-            weight: 3,              // Spessore del bordo del lotto
-            fillColor: "#ff2d6f",   // Colore di riempimento della particella
-            fillOpacity: 0.25       // Opacità interna per far vedere lo sfondo della mappa
-          }
-        }).addTo(map);
+        L.popup({ autoClose: true, closeOnClick: false })
+          .setLatLng(data.centro)
+          .setContent(`
+            <div class="popup-title" style="color: #ff2d6f; font-weight:800; margin-bottom:4px;">Particella Individuata</div>
+            <div class="row-sub">Comune: ${escapeHtml(comune)}<br>Foglio: ${escapeHtml(foglio)}<br>Particella: ${escapeHtml(particella)}</div>
+          `)
+          .openOn(map);
 
-        // 4. Associa un popup informativo alla sagoma geometrica
-        searchedParcelLayer.bindPopup(`
-          <div class="popup-title" style="color: #ff2d6f; font-weight:800; margin-bottom:4px;">Particella Individuata</div>
-          <div class="row-sub">Comune: ${comune}<br>Foglio: ${foglio}<br>Particella: ${particella}</div>
-        `).openPopup();
-        
-        // 5. Chiudi il drawer laterale per mostrare la mappa (ottimo su Mobile)
         el.drawer.classList.remove("open");
-        toast(`Visualizzati i confini di Foglio ${foglio}, Particella ${particella}`);
+        toast(`Centrata Foglio ${foglio}, Particella ${particella}`);
 
       } catch (err) {
         toast(err.message, 4000);
         console.error("Errore Geocoding Spaziale:", err);
       } finally {
-        // Rimuove il loader HUD al termine della chiamata
         el.loader.classList.remove("active");
       }
     });
