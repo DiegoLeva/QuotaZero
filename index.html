@@ -397,16 +397,6 @@
         </div>
         <div class="row">
           <div class="row-main">
-            <div class="row-title">Punti Fiduciali</div>
-            <div class="row-sub">PF catastali (Agenzia Entrate), zoom 16+</div>
-          </div>
-          <label class="switch" title="Mostra/nascondi punti fiduciali">
-            <input id="togglePF" type="checkbox">
-            <span></span>
-          </label>
-        </div>
-        <div class="row">
-          <div class="row-main">
             <div class="row-title">Satellite Google</div>
             <div class="row-sub">Ortofoto ad alta risoluzione</div>
           </div>
@@ -547,7 +537,6 @@
       toggleParcels: document.getElementById("toggleParcels"),
       toggleBuildings: document.getElementById("toggleBuildings"),
       toggleLabels: document.getElementById("toggleLabels"),
-      togglePF: document.getElementById("togglePF"),
       catastoOpacity: document.getElementById("catastoOpacity"),
       opacityValue: document.getElementById("opacityValue"),
       fileInput: document.getElementById("fileInput"),
@@ -595,7 +584,6 @@
       ["googlePane", 200],
       ["parcelPane", 420],
       ["buildingPane", 440],
-      ["pfPane", 460],
       ["labelPane", 470]
     ].forEach(([name, zIndex]) => {
       map.createPane(name);
@@ -653,18 +641,13 @@
 
     const parcelsLayer = makeCadastreLayer("CP.CadastralParcel", polygonSld("CP.CadastralParcel", "#ffffff", "#ffffff", "0", "1.5"), "parcelPane").addTo(map);
     const buildingsLayer = makeCadastreLayer("fabbricati", polygonSld("fabbricati", "#7b1118", "#7b1118", "0.34", "2.2"), "buildingPane").addTo(map);
-    const pfLayer = L.tileLayer.wms(WMS_URL, {
-      layers: "PF", styles: "", format: "image/png", transparent: true, version: "1.1.1",
-      crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 16, maxZoom: 22,
-      uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane: "pfPane"
-    });
     const labelsLayer = L.tileLayer.wms(WMS_URL, {
       layers: "codice_plla", styles: "", format: "image/png", transparent: true, version: "1.1.1",
       crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 18, maxZoom: 22,
       uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane: "labelPane", sld_body: labelSld()
     }).addTo(map);
 
-    const cadastreLayers = [parcelsLayer, buildingsLayer, labelsLayer, pfLayer];
+    const cadastreLayers = [parcelsLayer, buildingsLayer, labelsLayer];
     let catastoTileErrors = 0;
     cadastreLayers.forEach(layer => {
       layer.on("tileerror", () => {
@@ -942,7 +925,6 @@
     el.toggleParcels.addEventListener("change", e => setLayer(parcelsLayer, e.target.checked));
     el.toggleBuildings.addEventListener("change", e => setLayer(buildingsLayer, e.target.checked));
     el.toggleLabels.addEventListener("change", e => setLayer(labelsLayer, e.target.checked));
-    el.togglePF.addEventListener("change", e => setLayer(pfLayer, e.target.checked));
     el.catastoOpacity.addEventListener("input", e => {
       const v = Number(e.target.value); cadastreLayers.forEach(l => l.setOpacity(v)); el.opacityValue.textContent = `${Math.round(v * 100)}%`;
     });
