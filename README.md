@@ -40,7 +40,7 @@ Oltre ai Punti Fiduciali ufficiali (TAF, sola lettura) puoi **creare i tuoi PF**
 
 1. Premi il bottone **Aggiungi PF** (in alto nella colonna di bottoni in basso a destra). Compare un **mirino fisso al centro** (stile Google Earth): sposti la mappa sotto il mirino con il dito/mouse — più zoomi, più aumenti la precisione.
 2. Quando il mirino è sul punto, premi **OK** sulla barra in basso.
-3. Si apre una modale: in alto vedi **coordinate** e (se lo zoom lo permette) **comune / foglio / particella** ricavati interrogando il catasto. Puoi dare un **nome** al punto (se lo lasci vuoto ne viene generato uno automatico dal foglio-particella, con prefisso `PF`). Due bottoni permettono di allegare la **foto dello spigolo** e la **foto del dettaglio** (sul cellulare puoi scegliere fotocamera o galleria).
+3. Si apre una modale: in alto vedi **coordinate** e i campi **comune / foglio / particella** ricavati interrogando il catasto. Questi tre campi sono **modificabili**: se il punto cade *fuori* da ogni particella vengono pre-compilati con quelli della **particella più vicina** (e puoi correggerli a mano). Puoi dare un **nome** al punto (se lo lasci vuoto viene pre-compilato automaticamente come `PF foglio[allegato]-particella`, con prefisso `PF`). Due bottoni permettono di allegare la **foto dello spigolo** e la **foto del dettaglio** (sul cellulare puoi scegliere fotocamera o galleria).
 4. **Salva**: il punto viene registrato sul DB (posizione, nome, comune, progressivo, data/ora). Le foto **non** vanno sul DB, restano in memoria nella sessione corrente.
 
 Cliccando un punto già salvato si apre un mini-popup con tre azioni:
@@ -79,6 +79,7 @@ api/cerca-particella.js         # serverless: centroide di una particella (PostG
 api/cerca-comune.js             # serverless: centroide complessivo di un comune
 api/punti-fiduciali.js          # serverless: punti fiduciali ufficiali (TAF) per bbox/comune
 api/punti-rilievo.js            # serverless: CRUD dei PF aggiunti da noi (GET bbox / POST / PUT / DELETE)
+api/particella-vicina.js        # serverless: particella più vicina a un punto (PostGIS KNN)
 api/monografia.js               # serverless: risolve l'URL PDF AdE via scraping
 api/wms-proxy.js                # serverless: proxy CORS per WMS/WFS, tile AGEA e tile Google (ortofoto ZIP)
 scripts/import-fiduciali.mjs    # importer one-shot del GeoJSON TAF nel DB

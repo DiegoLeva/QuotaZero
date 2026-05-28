@@ -306,7 +306,7 @@
     .metric-value { font-weight: 800; }
     .metric-label { color: var(--muted); font-size: 12px; }
 
-    .toast { position: fixed; z-index: 1200; left: 50%; top: 70px; max-width: min(460px, calc(100vw - 28px)); transform: translateX(-50%) translateY(-120px); padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); color: var(--ink); background: var(--panel-solid); box-shadow: var(--shadow); font-size: 13px; line-height: 1.35; transition: transform .22s ease; text-align: center;}
+    .toast { position: fixed; z-index: 1200; left: 50%; top: 70px; max-width: min(460px, calc(100vw - 28px)); transform: translateX(-50%) translateY(calc(-100% - 90px)); padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); color: var(--ink); background: var(--panel-solid); box-shadow: var(--shadow); font-size: 13px; line-height: 1.35; transition: transform .22s ease; text-align: center;}
     .toast.show { transform: translateX(-50%) translateY(0); }
 
     .popup-title { margin: 0 0 8px; font-weight: 800; }
@@ -354,6 +354,7 @@
     .pf-meta-kv { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); }
     .pf-meta-kv span { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
     .pf-meta-kv strong { display: block; margin-top: 2px; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .pf-meta-kv input { width: 100%; margin-top: 3px; padding: 3px 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel-solid); color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
     .pf-field { display: block; margin-bottom: 12px; }
     .pf-field span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 5px; }
     .pf-field input { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--field); color: var(--ink); font-size: 14px; }
@@ -824,9 +825,9 @@
       </div>
       <div class="pf-modal-meta">
         <div class="pf-meta-kv"><span>Coordinate</span><strong id="pfMetaCoords">--</strong></div>
-        <div class="pf-meta-kv"><span>Comune</span><strong id="pfMetaComune">--</strong></div>
-        <div class="pf-meta-kv"><span>Foglio</span><strong id="pfMetaFoglio">--</strong></div>
-        <div class="pf-meta-kv"><span>Particella</span><strong id="pfMetaParticella">--</strong></div>
+        <div class="pf-meta-kv"><span>Comune</span><input id="pfMetaComune" type="text" autocomplete="off" placeholder="--"></div>
+        <div class="pf-meta-kv"><span>Foglio</span><input id="pfMetaFoglio" type="text" autocomplete="off" placeholder="--"></div>
+        <div class="pf-meta-kv"><span>Particella</span><input id="pfMetaParticella" type="text" autocomplete="off" placeholder="--"></div>
       </div>
       <label class="pf-field">
         <span>Nome del punto</span>
@@ -1264,7 +1265,7 @@
         const marker = L.circleMarker([p.lat, p.lng], {
           pane: "rilievoPane",
           radius: 5,
-          color: "#ffffff",
+          color: "#001015",
           weight: 1.5,
           fillColor: color,
           fillOpacity: eff
@@ -1453,15 +1454,35 @@
     }
 
     function pfAutoName() {
-      const d = state.rilievo.draft;
-      if (!d) return "";
-      if (d.foglio || d.particella) return `PF ${d.foglio || "?"}-${d.particella || "?"}`;
+      const fg = el.pfMetaFoglio.value.trim();
+      const pt = el.pfMetaParticella.value.trim();
+      if (fg || pt) return `PF ${fg || "?"}-${pt || "?"}`;
       return "";
     }
 
     function applyPfAutoName() {
       if (!state.rilievo.nameIsAuto) return;
       el.pfName.value = pfAutoName();
+    }
+
+    async function fetchNearestParcel(latlng) {
+      try {
+        const res = await fetch(`/api/particella-vicina?lat=${latlng.lat}&lng=${latlng.lng}`);
+        if (!res.ok) return null;
+        const d = await res.json();
+        if (!d || (!d.comune && !d.foglio && !d.particella)) return null;
+        return { comune: d.comune || "-", foglio: d.foglio || "-", allegato: d.allegato || "", particella: d.particella || "-", approx: true };
+      } catch (e) { return null; }
+    }
+
+    // Restituisce i dati catastali del punto: prima prova la particella esatta (WMS AdE),
+    // se il punto cade fuori da ogni particella ripiega sulla più vicina (PostGIS).
+    async function lookupParcelInfo(latlng) {
+      try {
+        const exact = await reverseParcel(latlng);
+        if (exact) return { ...exact, approx: false };
+      } catch (e) {}
+      return await fetchNearestParcel(latlng);
     }
 
     async function openPfModal({ latlng, editPoint, moved, nameText, nameIsAuto }) {
@@ -1482,33 +1503,28 @@
         state.rilievo.nameIsAuto = true;
       }
       resetPfPhotoUI();
-      state.rilievo.draft = { lat, lng, comune, foglio: "", particella: "", moved: !!moved };
+      state.rilievo.draft = { lat, lng, moved: !!moved };
       el.pfName.value = nome;
       el.pfMetaCoords.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      el.pfMetaComune.textContent = comune || "…";
-      el.pfMetaFoglio.textContent = "…";
-      el.pfMetaParticella.textContent = "…";
+      el.pfMetaComune.value = comune || "";
+      el.pfMetaFoglio.value = "";
+      el.pfMetaParticella.value = "";
+      el.pfMetaFoglio.placeholder = "…";
+      el.pfMetaParticella.placeholder = "…";
       el.pfMove.style.display = (state.rilievo.editId != null) ? "" : "none";
       el.pfModal.classList.add("show");
 
-      try {
-        const info = await reverseParcel({ lat, lng });
-        if (info) {
-          state.rilievo.draft.foglio = info.foglio !== "-" ? info.foglio : "";
-          state.rilievo.draft.particella = info.particella !== "-" ? info.particella : "";
-          if (info.comune && info.comune !== "-" && (!comune || moved)) state.rilievo.draft.comune = info.comune;
-          el.pfMetaComune.textContent = state.rilievo.draft.comune || comune || "-";
-          el.pfMetaFoglio.textContent = info.foglio !== "-" ? info.foglio + (info.allegato || "") : "-";
-          el.pfMetaParticella.textContent = info.particella || "-";
-        } else {
-          el.pfMetaComune.textContent = comune || "-";
-          el.pfMetaFoglio.textContent = "-";
-          el.pfMetaParticella.textContent = "-";
-        }
-      } catch (e) {
-        el.pfMetaComune.textContent = comune || "-";
-        el.pfMetaFoglio.textContent = "-";
-        el.pfMetaParticella.textContent = "-";
+      const token = (state.rilievo.lookupToken = (state.rilievo.lookupToken || 0) + 1);
+      const info = await lookupParcelInfo({ lat, lng });
+      if (token !== state.rilievo.lookupToken) return; // modale richiusa/riaperta nel frattempo
+      el.pfMetaFoglio.placeholder = "--";
+      el.pfMetaParticella.placeholder = "--";
+      if (info) {
+        const foglioFull = info.foglio && info.foglio !== "-" ? info.foglio + (info.allegato || "") : "";
+        if (info.comune && info.comune !== "-" && (!el.pfMetaComune.value.trim() || moved)) el.pfMetaComune.value = info.comune;
+        el.pfMetaFoglio.value = foglioFull;
+        el.pfMetaParticella.value = info.particella && info.particella !== "-" ? info.particella : "";
+        if (info.approx) toast("Punto fuori particella: ho inserito la particella più vicina (modificabile).");
       }
       applyPfAutoName();
     }
@@ -1522,8 +1538,8 @@
     async function savePfPoint() {
       const d = state.rilievo.draft;
       if (!d) return;
-      const nameInput = el.pfName.value.trim();
-      const nome = nameInput || ((d.foglio || d.particella) ? `PF ${d.foglio || "?"}-${d.particella || "?"}` : "");
+      const nome = el.pfName.value.trim() || pfAutoName();
+      const comune = el.pfMetaComune.value.trim();
       el.loader.classList.add("active");
       try {
         let saved;
@@ -1539,7 +1555,7 @@
         } else {
           const res = await fetch("/api/punti-rilievo", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ comune: d.comune, nome, lat: d.lat, lng: d.lng })
+            body: JSON.stringify({ comune, nome, lat: d.lat, lng: d.lng })
           });
           saved = await res.json();
           if (!res.ok) throw new Error(saved.error || "Errore salvataggio.");
@@ -1729,7 +1745,7 @@
         const lat = p.lat, lng = p.lng;
         const latStr = lat.toFixed(6), lngStr = lng.toFixed(6);
         let info = null;
-        try { info = await reverseParcel({ lat, lng }); } catch (e) {}
+        try { info = await lookupParcelInfo({ lat, lng }); } catch (e) {}
         const zip = new JSZip();
         const dt = p.createdAt ? new Date(p.createdAt) : new Date();
         const foglioTxt = info && info.foglio !== "-" ? info.foglio + (info.allegato || "") : "-";
@@ -1737,8 +1753,8 @@
           "PUNTO FIDUCIALE - RILIEVO",
           `Nome: ${rilievoDefaultName(p)}`,
           `Comune (codice): ${p.comune || "-"}`,
-          `Foglio: ${foglioTxt}`,
-          `Particella: ${info && info.particella !== "-" ? info.particella : "-"}`,
+          `Foglio: ${foglioTxt}${info && info.approx ? " (particella più vicina)" : ""}`,
+          `Particella: ${info && info.particella !== "-" ? info.particella : "-"}${info && info.approx ? " (particella più vicina)" : ""}`,
           `Latitudine: ${latStr}`,
           `Longitudine: ${lngStr}`,
           `Progressivo PF del comune: ${p.seq}`,
@@ -2467,6 +2483,8 @@
     el.pfSave.addEventListener("click", savePfPoint);
     el.pfMove.addEventListener("click", startPfMove);
     el.pfName.addEventListener("input", () => { state.rilievo.nameIsAuto = false; });
+    el.pfMetaFoglio.addEventListener("input", applyPfAutoName);
+    el.pfMetaParticella.addEventListener("input", applyPfAutoName);
     el.pfPhotoSpigolo.addEventListener("change", e => { state.rilievo.photos.spigolo = e.target.files[0] || null; refreshPfPhotoUI(); });
     el.pfPhotoDettaglio.addEventListener("change", e => { state.rilievo.photos.dettaglio = e.target.files[0] || null; refreshPfPhotoUI(); });
     document.addEventListener("click", e => {
