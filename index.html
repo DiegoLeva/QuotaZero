@@ -150,27 +150,50 @@
     .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .file-input { display: none; }
 
-    .gandalf-marker { background: transparent; border: 0; }
-    .gandalf-marker img { display: block; pointer-events: none; }
+    .gandalf-marker {
+      width: 64px !important; height: 64px !important;
+      background: transparent !important; border: 0 !important;
+    }
+    .gandalf-marker img {
+      width: 64px !important; height: 64px !important;
+      max-width: 64px; max-height: 64px;
+      display: block; pointer-events: none;
+    }
 
     .leaflet-tooltip.gandalf-bubble {
-      padding: 8px 14px;
-      color: #1a0510;
+      position: relative;
+      padding: 10px 18px;
+      color: #0a0f18;
       background: #fff;
-      border: 2px solid var(--danger);
-      border-radius: 16px;
+      border: 2.5px solid #0a0f18;
+      border-radius: 22px;
       font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", system-ui, sans-serif;
       font-weight: 800;
       font-size: 15px;
-      letter-spacing: .02em;
+      letter-spacing: .01em;
       white-space: nowrap;
-      box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 6px 22px rgba(255,45,111,.55);
-      animation: gandalf-pop .22s ease-out;
+      box-shadow: 4px 5px 0 0 #0a0f18, 0 14px 28px rgba(0,0,0,.45);
+      text-shadow: none;
+      opacity: 0;
+      animation: gandalf-fade .18s ease-out forwards;
     }
-    .leaflet-tooltip.gandalf-bubble::before { border-top-color: var(--danger) !important; }
-    @keyframes gandalf-pop {
-      from { transform: translateY(6px) scale(.6); opacity: 0; }
-      to   { transform: translateY(0) scale(1); opacity: 1; }
+    .leaflet-tooltip.gandalf-bubble::before { display: none !important; }
+    .leaflet-tooltip.gandalf-bubble::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -10px;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-right: 2.5px solid #0a0f18;
+      border-bottom: 2.5px solid #0a0f18;
+      transform: translateX(-50%) rotate(45deg);
+      border-bottom-right-radius: 4px;
+    }
+    @keyframes gandalf-fade {
+      from { opacity: 0; }
+      to   { opacity: 1; }
     }
 
     .metric { position: fixed; z-index: 720; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(120px); min-width: min(310px, calc(100vw - 112px)); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); box-shadow: var(--shadow); backdrop-filter: blur(18px); transition: transform .2s ease; }
@@ -698,17 +721,17 @@
     });
 
     const googleSat = L.tileLayer("https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
-      maxZoom: 22,
+      maxZoom: 23,
       subdomains: ["mt0", "mt1", "mt2", "mt3"],
       pane: "googlePane",
       attribution: "Google Satellite"
     }).addTo(map);
 
-    const bingSat = new BingSatellite("", { maxZoom: 22, subdomains: ["0", "1", "2", "3"], pane: "bingPane" });
+    const bingSat = new BingSatellite("", { maxZoom: 23, subdomains: ["0", "1", "2", "3"], pane: "bingPane" });
 
     const ageaOrtofoto = L.tileLayer.wms(PCN_AGEA_URL, {
       layers: "OI.ORTOIMMAGINI.2012.33", format: "image/jpeg", transparent: false, version: "1.3.0",
-      crs: L.CRS.EPSG3857, maxZoom: 22, pane: "ageaPane", tileSize: 512, updateWhenIdle: true
+      crs: L.CRS.EPSG3857, maxZoom: 23, pane: "ageaPane", tileSize: 512, updateWhenIdle: true
     });
 
     function polygonSld(layerName, stroke, fill, fillOpacity, strokeWidth) {
@@ -722,7 +745,7 @@
     function makeCadastreLayer(layerName, sldBody, pane) {
       return L.tileLayer.wms(WMS_URL, {
         layers: layerName, styles: "", format: "image/png", transparent: true, version: "1.1.1",
-        crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 16, maxZoom: 22,
+        crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 16, maxZoom: 23,
         uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane, sld_body: sldBody
       });
     }
@@ -731,7 +754,7 @@
     const buildingsLayer = makeCadastreLayer("fabbricati", polygonSld("fabbricati", "#7b1118", "#7b1118", "0.34", "2.2"), "buildingPane").addTo(map);
     const labelsLayer = L.tileLayer.wms(WMS_URL, {
       layers: "codice_plla", styles: "", format: "image/png", transparent: true, version: "1.1.1",
-      crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 18, maxZoom: 22,
+      crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 18, maxZoom: 23,
       uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane: "labelPane", sld_body: labelSld()
     }).addTo(map);
 
@@ -1286,10 +1309,11 @@
     setIdentifyMode(true);
 
     const GANDALF_SIZE = 64;
-    const gandalfMarker = L.marker([41.50044582554866, 13.557234185276197], {
+    const GANDALF_LATLNG = L.latLng(41.50044582554866, 13.557234185276197);
+    const gandalfMarker = L.marker(GANDALF_LATLNG, {
       icon: L.divIcon({
         className: "gandalf-marker",
-        html: `<img src="gandalf.gif" width="${GANDALF_SIZE}" height="${GANDALF_SIZE}" alt="">`,
+        html: `<img src="gandalf.gif" alt="">`,
         iconSize: [GANDALF_SIZE, GANDALF_SIZE],
         iconAnchor: [GANDALF_SIZE / 2, GANDALF_SIZE / 2]
       }),
@@ -1297,48 +1321,53 @@
       keyboard: false,
       pane: "markerPane"
     });
-    const GANDALF_MIN_ZOOM = 19;
+    const GANDALF_MIN_ZOOM = 23;
+    let gandalfBubbleTimer = null;
+    let gandalfBubble = null;
+
     function updateGandalf() {
-      if (map.getZoom() >= GANDALF_MIN_ZOOM) {
+      const visible = map.getZoom() >= GANDALF_MIN_ZOOM;
+      if (visible || gandalfBubbleTimer) {
         if (!map.hasLayer(gandalfMarker)) gandalfMarker.addTo(map);
-      } else if (map.hasLayer(gandalfMarker) && !gandalfBubbleTimer) {
+      } else if (map.hasLayer(gandalfMarker)) {
         map.removeLayer(gandalfMarker);
       }
     }
     map.on("zoomend", updateGandalf);
 
-    let gandalfBubbleTimer = null;
-    function showGandalfBubble() {
-      if (!map.hasLayer(gandalfMarker)) gandalfMarker.addTo(map);
-      gandalfMarker.unbindTooltip();
-      gandalfMarker.bindTooltip("Tu non puoi passare!", {
-        permanent: true,
-        direction: "top",
-        offset: [0, -(GANDALF_SIZE / 2 + 6)],
-        className: "gandalf-bubble",
-        interactive: false
-      }).openTooltip();
-      clearTimeout(gandalfBubbleTimer);
-      gandalfBubbleTimer = setTimeout(() => {
-        gandalfBubbleTimer = null;
-        gandalfMarker.unbindTooltip();
-        updateGandalf();
-      }, 4500);
+    function hideGandalfBubble() {
+      gandalfBubbleTimer = null;
+      if (gandalfBubble) { map.removeLayer(gandalfBubble); gandalfBubble = null; }
+      updateGandalf();
     }
 
-    const GANDALF_PARCELS = {
-      comune: "H917",
-      foglio: "5",
-      allegato: "A",
-      particelle: new Set(["1101", "194", "195", "1211"])
-    };
+    function showGandalfBubble() {
+      if (!map.hasLayer(gandalfMarker)) gandalfMarker.addTo(map);
+      if (gandalfBubble) { map.removeLayer(gandalfBubble); gandalfBubble = null; }
+      gandalfBubble = L.tooltip({
+        permanent: true,
+        direction: "top",
+        offset: [0, -(GANDALF_SIZE / 2 + 4)],
+        className: "gandalf-bubble",
+        interactive: false
+      })
+        .setLatLng(GANDALF_LATLNG)
+        .setContent("Tu non puoi passare!")
+        .addTo(map);
+      clearTimeout(gandalfBubbleTimer);
+      gandalfBubbleTimer = setTimeout(hideGandalfBubble, 4500);
+    }
+
+    const GANDALF_KEYS = new Set([
+      "H917|5|A|1101",
+      "H917|5|A|194",
+      "H917|5|A|195",
+      "H917|500||1211"
+    ]);
     function maybeTriggerGandalf(comune, foglio, allegato, particella) {
       if (!comune || !particella) return;
-      if (comune.toUpperCase() !== GANDALF_PARCELS.comune) return;
-      if (String(foglio) !== GANDALF_PARCELS.foglio) return;
-      if ((allegato || "").toUpperCase() !== GANDALF_PARCELS.allegato) return;
-      if (!GANDALF_PARCELS.particelle.has(String(particella))) return;
-      showGandalfBubble();
+      const key = `${String(comune).toUpperCase()}|${foglio}|${(allegato || "").toUpperCase()}|${particella}`;
+      if (GANDALF_KEYS.has(key)) showGandalfBubble();
     }
 
     updateGandalf();
