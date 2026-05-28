@@ -169,7 +169,8 @@
       opacity: 0;
       animation: gandalf-fade .18s ease-out forwards;
     }
-    .leaflet-tooltip.gandalf-bubble .gandalf-bubble-inner { display: inline-block; transform-origin: 50% 100%; }
+    /* Tooltip will be scaled as a whole to match GIF size */
+    .leaflet-tooltip.gandalf-bubble { transform-origin: 50% 100%; }
     .leaflet-tooltip.gandalf-bubble::before { display: none !important; }
     .leaflet-tooltip.gandalf-bubble::after {
       content: "";
@@ -1231,16 +1232,20 @@
 
         map.setView(data.centro, 19.5, { animate: true, duration: 1.5 });
 
-        L.popup({ autoClose: true, closeOnClick: false })
-          .setLatLng(data.centro)
-          .setContent(`
-            <div class="popup-title" style="color: #ff2d6f; font-weight:800; margin-bottom:4px;">Particella Individuata</div>
-            <div class="row-sub">Comune: ${escapeHtml(match.name)} (${escapeHtml(comune)})<br>Foglio: ${escapeHtml(foglioDisplay)}<br>Particella: ${escapeHtml(particella)}</div>
-            <div class="popup-actions"><a class="btn blue" href="https://maps.google.com/?q=${data.centro[0]},${data.centro[1]}" target="_blank"><span class="icon">navigation</span> Google Maps</a></div>
-          `)
-          .openOn(map);
-
-        maybeTriggerGandalf(comune, foglio, allegato, particella);
+        // se la particella è una delle chiavi Gandalf, non mostrare il popup
+        const _gKey = `${String(comune).toUpperCase()}|${foglio}|${(allegato||"").toUpperCase()}|${particella}`;
+        if (GANDALF_KEYS.has(_gKey)) {
+          maybeTriggerGandalf(comune, foglio, allegato, particella);
+        } else {
+          L.popup({ autoClose: true, closeOnClick: false })
+            .setLatLng(data.centro)
+            .setContent(`
+              <div class="popup-title" style="color: #ff2d6f; font-weight:800; margin-bottom:4px;">Particella Individuata</div>
+              <div class="row-sub">Comune: ${escapeHtml(match.name)} (${escapeHtml(comune)})<br>Foglio: ${escapeHtml(foglioDisplay)}<br>Particella: ${escapeHtml(particella)}</div>
+              <div class="popup-actions"><a class="btn blue" href="https://maps.google.com/?q=${data.centro[0]},${data.centro[1]}" target="_blank"><span class="icon">navigation</span> Google Maps</a></div>
+            `)
+            .openOn(map);
+        }
 
         el.drawer.classList.remove("open");
         toast(`Centrata Foglio ${foglioDisplay}, Particella ${particella}`);
@@ -1351,15 +1356,12 @@
         .setLatLng([GANDALF_BOUNDS.getNorth(), GANDALF_CENTER.lng])
         .setContent("Tu non puoi passare!")
         .addTo(map);
-      // wrap content in inner element so we can scale it independently
+      // scale the whole tooltip (bubble) to match the GIF width
       try {
         const el = gandalfBubble.getElement && gandalfBubble.getElement();
         if (el) {
-          const inner = document.createElement('div');
-          inner.className = 'gandalf-bubble-inner';
-          inner.innerHTML = el.innerHTML;
-          el.innerHTML = '';
-          el.appendChild(inner);
+          el.style.transformOrigin = '50% 100%';
+          el.style.transform = 'scale(1)';
           updateGandalfBubbleScale();
         }
       } catch (e) { /* ignore in older leaflet */ }
@@ -1370,17 +1372,17 @@
       if (!gandalfBubble) return;
       const el = gandalfBubble.getElement && gandalfBubble.getElement();
       if (!el) return;
-      const inner = el.querySelector && el.querySelector('.gandalf-bubble-inner');
-      if (!inner) return;
+      // scale the tooltip element itself
       try {
+        const rect = el.getBoundingClientRect();
+        const elWidth = rect.width || 1;
         const nw = map.latLngToLayerPoint(L.latLng(GANDALF_CENTER.lat, GANDALF_BOUNDS.getWest()));
         const ne = map.latLngToLayerPoint(L.latLng(GANDALF_CENTER.lat, GANDALF_BOUNDS.getEast()));
         const gifWidth = Math.max(8, Math.abs(ne.x - nw.x));
-        const rect = inner.getBoundingClientRect();
-        const innerWidth = rect.width || 1;
-        const scale = (gifWidth * 0.9) / innerWidth;
-        inner.style.transform = `scale(${scale})`;
+        const scale = (gifWidth * 0.9) / elWidth;
+        el.style.transform = `scale(${scale})`;
       } catch (e) { /* noop */ }
+      return;
     }
 
     const GANDALF_KEYS = new Set([
