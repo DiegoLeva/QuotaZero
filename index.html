@@ -723,29 +723,6 @@
         <div id="offlineInfo" class="hint"></div>
       </section>
 
-      <section class="section">
-        <div class="section-title">Strumenti</div>
-        <div class="row">
-          <div class="row-main">
-            <div class="row-title">Misura distanza</div>
-            <div class="row-sub">Tocca la mappa per aggiungere punti</div>
-          </div>
-          <label class="switch" title="Misura distanza">
-            <input id="toggleMeasure" type="checkbox">
-            <span></span>
-          </label>
-        </div>
-        <div class="row">
-          <div class="row-main">
-            <div class="row-title">Interroga particella</div>
-            <div class="row-sub">Tieni premuto sulla mappa o usa click destro</div>
-          </div>
-          <label class="switch" title="Interroga catasto">
-            <input id="toggleIdentify" type="checkbox" checked>
-            <span></span>
-          </label>
-        </div>
-      </section>
     </div>
   </aside>
 
@@ -981,8 +958,6 @@
       comuneSearchClose: document.getElementById("comuneSearchClose"),
       measureBtn: document.getElementById("measureBtn"),
       identifyBtn: document.getElementById("identifyBtn"),
-      toggleMeasure: document.getElementById("toggleMeasure"),
-      toggleIdentify: document.getElementById("toggleIdentify"),
       metric: document.getElementById("metric"),
       metricValue: document.getElementById("metricValue"),
       clearMeasure: document.getElementById("clearMeasure"),
@@ -1144,7 +1119,6 @@
     function setMeasureMode(active) {
       state.measuring = active;
       el.measureBtn.classList.toggle("active", active);
-      el.toggleMeasure.checked = active;
       el.metric.classList.toggle("show", active || state.measurePoints.length > 0);
       map.getContainer().style.cursor = active ? "crosshair" : "";
       if (active) toast("Misura attiva. Tocca la mappa per aggiungere punti.");
@@ -1153,7 +1127,6 @@
     function setIdentifyMode(active) {
       state.identify = active;
       el.identifyBtn.classList.toggle("active", active);
-      el.toggleIdentify.checked = active;
       if (active) toast("Interrogazione catasto attiva: tieni premuto su una particella.");
     }
 
@@ -2517,9 +2490,7 @@
     el.routeModal.addEventListener("click", e => { if (e.target === el.routeModal) el.routeModal.classList.remove("show"); });
     el.gpsBtn.addEventListener("click", geolocate);
     el.measureBtn.addEventListener("click", () => setMeasureMode(!state.measuring));
-    el.toggleMeasure.addEventListener("change", e => setMeasureMode(e.target.checked));
     el.identifyBtn.addEventListener("click", () => setIdentifyMode(!state.identify));
-    el.toggleIdentify.addEventListener("change", e => setIdentifyMode(e.target.checked));
     el.clearMeasure.addEventListener("click", clearMeasure);
     el.saveOffline.addEventListener("click", saveOffline);
     el.loadOffline.addEventListener("click", () => {
