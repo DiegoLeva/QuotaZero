@@ -1010,7 +1010,9 @@
           bbox: `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
           maxFeatures: String(ISOIPSE_MAX_FEATURES)
         });
-        const res = await fetch(`${LAZIO_WFS_URL}?${params}`, { signal: ctrl.signal });
+        const wfsUrl = `${LAZIO_WFS_URL}?${params}`;
+        const proxied = `/api/wms-proxy?url=${encodeURIComponent(wfsUrl)}`;
+        const res = await fetch(proxied, { signal: ctrl.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!state.isoipse.visible) return;

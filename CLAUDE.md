@@ -87,9 +87,9 @@ Returns `{ centro: [lat, lng] }` — centroid of the **union** of all particelle
 
 ## Backend contract — `/api/wms-proxy`
 
-`GET /api/wms-proxy?url=<encoded WMS URL>`
+`GET /api/wms-proxy?url=<encoded OGC URL>`
 
-Pass-through proxy that fetches the URL server-side and returns the body. Exists only to bypass CORS on the Agenzia delle Entrate WMS for `GetFeatureInfo` calls. Frontend falls back to a direct fetch if the proxy fails.
+Pass-through proxy that fetches the URL server-side and returns the body, with permissive CORS headers. Originally added to bypass CORS on the Agenzia delle Entrate WMS for `GetFeatureInfo` calls (the frontend falls back to a direct fetch if the proxy fails on that path). Now also used by the **Isoipse WFS** flow against the Regione Lazio GeoServer, which does not send CORS headers — there the call **must** go through the proxy or the browser blocks it.
 
 ## Conventions worth keeping
 
