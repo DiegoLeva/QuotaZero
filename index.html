@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+  <script src="https://unpkg.com/leaflet-textpath@1.2.3/leaflet.textpath.js"></script>
 
   <style>
     :root {
@@ -653,6 +654,7 @@
     const WMS_URL = "https://wms.cartografia.agenziaentrate.gov.it/inspire/wms/ows01.php";
     const PCN_AGEA_URL = "https://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_12.map";
     const LAZIO_WMS_URL = "https://geoportale.regione.lazio.it/geoserver/ows";
+    const LAZIO_WFS_URL = "https://geoportale.regione.lazio.it/geoserver/ows";
     const CATASTO_CRS = L.extend({}, L.CRS.EPSG4326, { code: "EPSG:4258" });
     const CATASTO_TILE_SIZE = 512;
     const STORAGE_KEY = "quotazero_state_v1";
@@ -673,7 +675,8 @@
       userMarker: null,
       pressTimer: null,
       lastPressLatLng: null,
-      fiduciali: { visible: false, loading: false, fetchAbort: null, debounceTimer: null }
+      fiduciali: { visible: false, loading: false, fetchAbort: null, debounceTimer: null },
+      isoipse: { visible: false, loading: false, fetchAbort: null, debounceTimer: null }
     };
 
     const el = {
@@ -812,10 +815,8 @@
       uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane: "labelPane", sld_body: labelSld()
     }).addTo(map);
 
-    const isoipseLayer = L.tileLayer.wms(LAZIO_WMS_URL, {
-      layers: "geonode:curve_livello", format: "image/png", transparent: true, version: "1.3.0",
-      crs: L.CRS.EPSG3857, maxZoom: 23, pane: "isoipsePane", tileSize: 512, updateWhenIdle: true
-    });
+    const isoipseRenderer = L.svg({ pane: "isoipsePane" });
+    const isoipseLayer = L.layerGroup([], { pane: "isoipsePane" });
 
     const fiduciariLayer = L.layerGroup([], { pane: "fiduciariPane" });
 
@@ -946,6 +947,103 @@
         clearTimeout(state.fiduciali.debounceTimer);
         if (map.hasLayer(fiduciariLayer)) map.removeLayer(fiduciariLayer);
         fiduciariLayer.clearLayers();
+      }
+    }
+
+    const ISOIPSE_MIN_ZOOM = 13;
+    const ISOIPSE_MAX_FEATURES = 600;
+
+    function renderIsoipse(features) {
+      isoipseLayer.clearLayers();
+      for (const f of features) {
+        if (!f.geometry) continue;
+        const layer = L.geoJSON(f, {
+          pane: "isoipsePane",
+          renderer: isoipseRenderer,
+          style: { color: "#ffcc33", weight: 1.1, opacity: 0.9 }
+        });
+        const q = f.properties && f.properties.cv_liv_q;
+        const n = q == null ? NaN : parseFloat(q);
+        if (Number.isFinite(n)) {
+          const label = `    ${Math.round(n)} m    `;
+          layer.eachLayer(sub => {
+            if (typeof sub.setText === "function") {
+              sub.setText(label, {
+                repeat: true,
+                offset: 4,
+                attributes: {
+                  fill: "#ffcc33",
+                  "font-size": "11",
+                  "font-weight": "bold",
+                  "font-family": "Inter, Arial, sans-serif",
+                  stroke: "#050a12",
+                  "stroke-width": "2.5",
+                  "paint-order": "stroke"
+                }
+              });
+            }
+          });
+        }
+        layer.addTo(isoipseLayer);
+      }
+    }
+
+    async function loadIsoipseByBbox() {
+      if (!state.isoipse.visible) return;
+      if (map.getZoom() < ISOIPSE_MIN_ZOOM) {
+        isoipseLayer.clearLayers();
+        return;
+      }
+      if (state.isoipse.fetchAbort) state.isoipse.fetchAbort.abort();
+      const ctrl = new AbortController();
+      state.isoipse.fetchAbort = ctrl;
+      state.isoipse.loading = true;
+      try {
+        const b = map.getBounds();
+        const params = new URLSearchParams({
+          service: "WFS",
+          version: "1.0.0",
+          request: "GetFeature",
+          typeName: "geonode:curve_livello",
+          outputFormat: "application/json",
+          srsName: "EPSG:4326",
+          bbox: `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
+          maxFeatures: String(ISOIPSE_MAX_FEATURES)
+        });
+        const res = await fetch(`${LAZIO_WFS_URL}?${params}`, { signal: ctrl.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!state.isoipse.visible) return;
+        renderIsoipse(data.features || []);
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        console.error("Errore Isoipse:", err);
+        toast("Impossibile caricare le isoipse.");
+      } finally {
+        state.isoipse.loading = false;
+        if (state.isoipse.fetchAbort === ctrl) state.isoipse.fetchAbort = null;
+      }
+    }
+
+    function scheduleIsoipseReload() {
+      clearTimeout(state.isoipse.debounceTimer);
+      state.isoipse.debounceTimer = setTimeout(loadIsoipseByBbox, 320);
+    }
+
+    function setIsoipseMode(visible) {
+      state.isoipse.visible = visible;
+      el.toggleIsoipse.checked = visible;
+      if (visible) {
+        if (!map.hasLayer(isoipseLayer)) map.addLayer(isoipseLayer);
+        if (map.getZoom() < ISOIPSE_MIN_ZOOM) {
+          toast(`Zoom almeno ${ISOIPSE_MIN_ZOOM} per vedere le isoipse.`);
+        }
+        loadIsoipseByBbox();
+      } else {
+        if (state.isoipse.fetchAbort) state.isoipse.fetchAbort.abort();
+        clearTimeout(state.isoipse.debounceTimer);
+        if (map.hasLayer(isoipseLayer)) map.removeLayer(isoipseLayer);
+        isoipseLayer.clearLayers();
       }
     }
 
@@ -1338,12 +1436,13 @@
     el.toggleGoogle.addEventListener("change", e => setLayer(googleSat, e.target.checked));
     el.toggleBing.addEventListener("change", e => setLayer(bingSat, e.target.checked));
     el.toggleAgea.addEventListener("change", e => setLayer(ageaOrtofoto, e.target.checked));
-    el.toggleIsoipse.addEventListener("change", e => setLayer(isoipseLayer, e.target.checked));
+    el.toggleIsoipse.addEventListener("change", e => setIsoipseMode(e.target.checked));
     el.toggleParcels.addEventListener("change", e => setLayer(parcelsLayer, e.target.checked));
     el.toggleBuildings.addEventListener("change", e => setLayer(buildingsLayer, e.target.checked));
     el.toggleLabels.addEventListener("change", e => setLayer(labelsLayer, e.target.checked));
     el.toggleFiduciali.addEventListener("change", e => setFiduciariMode(e.target.checked));
     map.on("moveend zoomend", () => { if (state.fiduciali.visible) scheduleFiduciariReload(); });
+    map.on("moveend zoomend", () => { if (state.isoipse.visible) scheduleIsoipseReload(); });
     el.catastoOpacity.addEventListener("input", e => {
       const v = Number(e.target.value); cadastreLayers.forEach(l => l.setOpacity(v)); el.opacityValue.textContent = `${Math.round(v * 100)}%`;
     });
