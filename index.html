@@ -150,15 +150,7 @@
     .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .file-input { display: none; }
 
-    .gandalf-marker {
-      width: 64px !important; height: 64px !important;
-      background: transparent !important; border: 0 !important;
-    }
-    .gandalf-marker img {
-      width: 64px !important; height: 64px !important;
-      max-width: 64px; max-height: 64px;
-      display: block; pointer-events: none;
-    }
+    .gandalf-overlay { pointer-events: none; image-rendering: auto; }
 
     .leaflet-tooltip.gandalf-bubble {
       position: relative;
@@ -1308,18 +1300,18 @@
 
     setIdentifyMode(true);
 
-    const GANDALF_SIZE = 64;
-    const GANDALF_LATLNG = L.latLng(41.50044582554866, 13.557234185276197);
-    const gandalfMarker = L.marker(GANDALF_LATLNG, {
-      icon: L.divIcon({
-        className: "gandalf-marker",
-        html: `<img src="gandalf.gif" alt="">`,
-        iconSize: [GANDALF_SIZE, GANDALF_SIZE],
-        iconAnchor: [GANDALF_SIZE / 2, GANDALF_SIZE / 2]
-      }),
+    const GANDALF_CENTER = L.latLng(41.50044582554866, 13.557234185276197);
+    const GANDALF_HALF_LAT = 0.000018;
+    const GANDALF_HALF_LNG = 0.000024;
+    const GANDALF_BOUNDS = L.latLngBounds(
+      [GANDALF_CENTER.lat - GANDALF_HALF_LAT, GANDALF_CENTER.lng - GANDALF_HALF_LNG],
+      [GANDALF_CENTER.lat + GANDALF_HALF_LAT, GANDALF_CENTER.lng + GANDALF_HALF_LNG]
+    );
+    const gandalfOverlay = L.imageOverlay("gandalf.gif", GANDALF_BOUNDS, {
       interactive: false,
-      keyboard: false,
-      pane: "markerPane"
+      pane: "markerPane",
+      className: "gandalf-overlay",
+      alt: ""
     });
     const GANDALF_MIN_ZOOM = 20;
     let gandalfBubbleTimer = null;
@@ -1328,9 +1320,9 @@
     function updateGandalf() {
       const visible = map.getZoom() >= GANDALF_MIN_ZOOM;
       if (visible || gandalfBubbleTimer) {
-        if (!map.hasLayer(gandalfMarker)) gandalfMarker.addTo(map);
-      } else if (map.hasLayer(gandalfMarker)) {
-        map.removeLayer(gandalfMarker);
+        if (!map.hasLayer(gandalfOverlay)) gandalfOverlay.addTo(map);
+      } else if (map.hasLayer(gandalfOverlay)) {
+        map.removeLayer(gandalfOverlay);
       }
     }
     map.on("zoomend", updateGandalf);
@@ -1342,19 +1334,18 @@
     }
 
     function showGandalfBubble() {
-      if (!map.hasLayer(gandalfMarker)) gandalfMarker.addTo(map);
-      if (gandalfBubble) { map.removeLayer(gandalfBubble); gandalfBubble = null; }
+      if (gandalfBubbleTimer) return;
+      if (!map.hasLayer(gandalfOverlay)) gandalfOverlay.addTo(map);
       gandalfBubble = L.tooltip({
         permanent: true,
         direction: "top",
-        offset: [0, -(GANDALF_SIZE / 2 + 4)],
+        offset: [0, -2],
         className: "gandalf-bubble",
         interactive: false
       })
-        .setLatLng(GANDALF_LATLNG)
+        .setLatLng([GANDALF_BOUNDS.getNorth(), GANDALF_CENTER.lng])
         .setContent("Tu non puoi passare!")
         .addTo(map);
-      clearTimeout(gandalfBubbleTimer);
       gandalfBubbleTimer = setTimeout(hideGandalfBubble, 4500);
     }
 
