@@ -12,13 +12,10 @@ L'interfaccia è in stile HUD/cyberpunk (cyan neon, rosa, lime) con tutti i coma
 
 ### Mappa e livelli
 - **Sfondi satellitari** commutabili: Google Satellite (default), Bing Satellite, Ortofoto AGEA 2012 (Geoportale Nazionale).
-- **Isoipse (curve di livello)**: layer attivabile, fornito dal WFS del Geoportale Regione Lazio (`geonode:curve_livello`, salto di quota 5 m). Il GeoServer del Lazio rifiuta gli SLD inline (`Dynamic style usage is forbidden`) e non manda gli header CORS, quindi lo strato viene scaricato in vettoriale (GeoJSON via WFS 1.0.0, filtrato al bbox del viewport, max 600 feature) attraverso il proxy serverless `/api/wms-proxy`. Ogni polilinea è renderizzata in giallo `#ffcc33` sopra al catasto, e il valore di quota (`cv_liv_q`) è mostrato come tooltip permanente al punto medio della curva, stilizzato con halo scuro per essere leggibile sull'ortofoto. Visibile da zoom 13 in su.
-- **Catasto Agenzia delle Entrate** via WMS, sovrapposto come tre livelli indipendenti:
-  - **Particelle** (confini in bianco)
-  - **Fabbricati** (sagome in rosso scuro)
-  - **Numeri particella** (etichette gialle, visibili da zoom 18 in su)
-- **Punti Fiduciali (TAF)**: layer attivabile che mostra i punti fiduciali del Catasto sotto forma di pallini cyan, caricati dinamicamente in base al viewport (zoom minimo 14). Il popup di ogni punto mostra `Codice PF`, descrizione, foglio/particella e include due bottoni: **Naviga** (Google Maps) e **Monografia** (apre il PDF ufficiale dell'Agenzia delle Entrate in una nuova scheda — vedi nota sotto).
-- Slider per regolare l'opacità del catasto.
+- **Isoipse (curve di livello)**: layer attivabile, fornito dal WFS del Geoportale Regione Lazio (`geonode:curve_livello`, salto di quota 5 m). Il GeoServer del Lazio rifiuta gli SLD inline (`Dynamic style usage is forbidden`) e non manda gli header CORS, quindi lo strato viene scaricato in vettoriale (GeoJSON via WFS 1.0.0, filtrato al bbox del viewport, max 600 feature) attraverso il proxy serverless `/api/wms-proxy`. Il valore di quota (`cv_liv_q`) è mostrato come tooltip permanente al punto medio di ogni curva, con halo scuro per la leggibilità sull'ortofoto. Visibile da zoom 13 in su.
+- **Catasto Agenzia delle Entrate** via WMS, sovrapposto come tre livelli indipendenti: **Particelle**, **Fabbricati** (zoom 16+) e **Numeri particella** (zoom 18+).
+- **Punti Fiduciali (TAF)**: layer attivabile che mostra i punti fiduciali del Catasto come pallini caricati dinamicamente in base al viewport (zoom minimo 14). Il popup di ogni punto mostra `Codice PF`, descrizione, foglio/particella e include due bottoni: **Naviga** (Google Maps) e **Monografia** (apre il PDF ufficiale dell'Agenzia delle Entrate in una nuova scheda — vedi nota sotto).
+- **Personalizza colore e opacità**: dal pannello laterale si apre un dialog dove per ciascun livello (isoipse, particelle, fabbricati, numeri, satelliti, punti fiduciali) si possono regolare colore e opacità con anteprima immediata. Le scelte si salvano in `localStorage` (chiave `quotazero_prefs_v1`) e vengono ripristinate a ogni sessione, insieme allo stato on/off di ogni livello.
 - Il catasto risponde solo a scala alta: i livelli si attivano automaticamente da zoom 16.
 
 ### Ricerca particella

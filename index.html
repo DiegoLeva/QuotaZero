@@ -68,11 +68,46 @@
 
     .leaflet-tooltip.iso-tip {
       background: transparent; border: 0; box-shadow: none; padding: 0;
-      color: #a5ff2f; font-size: 11px; font-weight: 700; letter-spacing: .3px;
+      color: var(--iso-color, #a5ff2f); font-size: 11px; font-weight: 700; letter-spacing: .3px;
       text-shadow: 0 0 2px #050a12, 0 0 3px #050a12, 0 0 3px #050a12, 0 0 4px #050a12;
       pointer-events: none; white-space: nowrap;
     }
     .leaflet-tooltip.iso-tip::before { display: none; }
+
+    .layer-settings-modal {
+      position: fixed; inset: 0; z-index: 900; display: none;
+      background: rgba(2,6,12,.72); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center; padding: 18px;
+    }
+    .layer-settings-modal.show { display: flex; }
+    .layer-settings-box {
+      background: var(--panel-solid); border: 1px solid var(--line);
+      border-radius: var(--r); padding: 14px 18px; max-width: 460px; width: 100%;
+      max-height: 88vh; overflow: auto; box-shadow: var(--shadow);
+    }
+    .layer-settings-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .layer-settings-head h3 { margin: 0; font-size: 16px; color: var(--accent); letter-spacing: .5px; text-transform: uppercase; }
+    .layer-settings-close {
+      width: 32px; height: 32px; display: grid; place-items: center;
+      background: var(--field); border: 1px solid var(--line); color: var(--ink); border-radius: 6px;
+    }
+    .layer-settings-hint { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+    .layer-settings-body { display: flex; flex-direction: column; gap: 6px; }
+    .ls-row {
+      display: grid; grid-template-columns: 1fr auto auto auto;
+      gap: 10px; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--line);
+    }
+    .ls-row:last-child { border-bottom: 0; }
+    .ls-name { font-weight: 600; font-size: 14px; }
+    .ls-color {
+      width: 34px; height: 28px; padding: 0; background: transparent;
+      border: 1px solid var(--line); border-radius: 6px; cursor: pointer; appearance: none; -webkit-appearance: none;
+    }
+    .ls-color::-webkit-color-swatch-wrapper { padding: 2px; }
+    .ls-color::-webkit-color-swatch { border: 0; border-radius: 4px; }
+    .ls-color-placeholder { width: 34px; height: 28px; }
+    .ls-opacity { width: 110px; }
+    .ls-opval { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
 
     .icon {
       font-family: "Material Symbols Rounded"; font-weight: 500; font-style: normal;
@@ -472,7 +507,7 @@
         <div class="row">
           <div class="row-main">
             <div class="row-title">Numeri particelle</div>
-            <div class="row-sub">Giallo cantiere, dimensione 1.5x</div>
+            <div class="row-sub">Etichette catastali, zoom 18+</div>
           </div>
           <label class="switch" title="Mostra/nascondi numeri particelle">
             <input id="toggleLabels" type="checkbox" checked>
@@ -482,7 +517,7 @@
         <div class="row">
           <div class="row-main">
             <div class="row-title">Fabbricati</div>
-            <div class="row-sub">Sagome catastali in rosso scuro</div>
+            <div class="row-sub">Sagome catastali, zoom 16+</div>
           </div>
           <label class="switch" title="Mostra/nascondi fabbricati">
             <input id="toggleBuildings" type="checkbox" checked>
@@ -502,7 +537,7 @@
         <div class="row">
           <div class="row-main">
             <div class="row-title">Particelle</div>
-            <div class="row-sub">Confini catastali in bianco, zoom 16+</div>
+            <div class="row-sub">Confini catastali, zoom 16+</div>
           </div>
           <label class="switch" title="Mostra/nascondi particelle">
             <input id="toggleParcels" type="checkbox" checked>
@@ -549,10 +584,9 @@
             <span></span>
           </label>
         </div>
-        <div class="range-row">
-          <input id="catastoOpacity" type="range" min="0" max="1" step="0.05" value="0.78" aria-label="Opacita catasto">
-          <strong id="opacityValue">78%</strong>
-        </div>
+        <button class="btn full" id="openLayerSettings" type="button" style="margin-top:8px">
+          <span class="icon">tune</span> Personalizza colore e opacità
+        </button>
       </section>
 
       <section class="section">
@@ -654,6 +688,17 @@
     </div>
   </div>
 
+  <div class="layer-settings-modal" id="layerSettingsModal" aria-hidden="true">
+    <div class="layer-settings-box">
+      <div class="layer-settings-head">
+        <h3>Personalizza livelli</h3>
+        <button class="layer-settings-close" id="layerSettingsClose" aria-label="Chiudi"><span class="icon">close</span></button>
+      </div>
+      <p class="layer-settings-hint">Colore e opacità di ogni livello. Le modifiche sono immediate e restano salvate.</p>
+      <div class="layer-settings-body" id="layerSettingsBody"></div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
   <div class="hud-loader" id="hudLoader"><div class="spinner"></div><span>Elaborazione...</span></div>
   
@@ -665,7 +710,50 @@
     const CATASTO_CRS = L.extend({}, L.CRS.EPSG4326, { code: "EPSG:4258" });
     const CATASTO_TILE_SIZE = 512;
     const STORAGE_KEY = "quotazero_state_v1";
+    const PREFS_KEY = "quotazero_prefs_v1";
     const TILE_CACHE = "quotazero-tiles-v1";
+
+    const DEFAULT_PREFS = {
+      google:    { visible: true,  opacity: 1.00 },
+      bing:      { visible: false, opacity: 1.00 },
+      agea:      { visible: false, opacity: 1.00 },
+      parcels:   { visible: true,  opacity: 0.78, color: "#ffffff" },
+      buildings: { visible: true,  opacity: 0.78, color: "#7b1118" },
+      labels:    { visible: true,  opacity: 0.78, color: "#ffcc33" },
+      fiduciali: { visible: false, opacity: 0.95, color: "#00f5ff" },
+      isoipse:   { visible: false, opacity: 0.90, color: "#a5ff2f" }
+    };
+
+    const LAYER_META = [
+      { key: "google",    name: "Satellite Google",   hasColor: false },
+      { key: "bing",      name: "Satellite Bing",     hasColor: false },
+      { key: "agea",      name: "Ortofoto AGEA 2012", hasColor: false },
+      { key: "parcels",   name: "Particelle",         hasColor: true  },
+      { key: "buildings", name: "Fabbricati",         hasColor: true  },
+      { key: "labels",    name: "Numeri particelle",  hasColor: true  },
+      { key: "fiduciali", name: "Punti Fiduciali",    hasColor: true  },
+      { key: "isoipse",   name: "Isoipse",            hasColor: true  }
+    ];
+
+    function loadPrefs() {
+      const merged = JSON.parse(JSON.stringify(DEFAULT_PREFS));
+      try {
+        const raw = localStorage.getItem(PREFS_KEY);
+        if (!raw) return merged;
+        const stored = JSON.parse(raw);
+        for (const k of Object.keys(merged)) {
+          if (stored[k] && typeof stored[k] === "object") Object.assign(merged[k], stored[k]);
+        }
+      } catch (e) { console.warn("Prefs load failed", e); }
+      return merged;
+    }
+
+    function savePrefs() {
+      try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
+      catch (e) { console.warn("Prefs save failed", e); }
+    }
+
+    const prefs = loadPrefs();
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(err => console.warn("SW register failed", err));
@@ -698,8 +786,10 @@
       toggleBuildings: document.getElementById("toggleBuildings"),
       toggleLabels: document.getElementById("toggleLabels"),
       toggleFiduciali: document.getElementById("toggleFiduciali"),
-      catastoOpacity: document.getElementById("catastoOpacity"),
-      opacityValue: document.getElementById("opacityValue"),
+      openLayerSettings: document.getElementById("openLayerSettings"),
+      layerSettingsModal: document.getElementById("layerSettingsModal"),
+      layerSettingsClose: document.getElementById("layerSettingsClose"),
+      layerSettingsBody: document.getElementById("layerSettingsBody"),
       fileInput: document.getElementById("fileInput"),
       clearImported: document.getElementById("clearImported"),
       importedLayers: document.getElementById("importedLayers"),
@@ -788,39 +878,41 @@
       maxZoom: 23,
       subdomains: ["mt0", "mt1", "mt2", "mt3"],
       pane: "googlePane",
-      attribution: "Google Satellite"
-    }).addTo(map);
+      attribution: "Google Satellite",
+      opacity: prefs.google.opacity
+    });
 
-    const bingSat = new BingSatellite("", { maxZoom: 23, subdomains: ["0", "1", "2", "3"], pane: "bingPane" });
+    const bingSat = new BingSatellite("", { maxZoom: 23, subdomains: ["0", "1", "2", "3"], pane: "bingPane", opacity: prefs.bing.opacity });
 
     const ageaOrtofoto = L.tileLayer.wms(PCN_AGEA_URL, {
       layers: "OI.ORTOIMMAGINI.2012.33", format: "image/jpeg", transparent: false, version: "1.3.0",
-      crs: L.CRS.EPSG3857, maxZoom: 23, pane: "ageaPane", tileSize: 512, updateWhenIdle: true
+      crs: L.CRS.EPSG3857, maxZoom: 23, pane: "ageaPane", tileSize: 512, updateWhenIdle: true,
+      opacity: prefs.agea.opacity
     });
 
     function polygonSld(layerName, stroke, fill, fillOpacity, strokeWidth) {
       return `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><NamedLayer><Name>${layerName}</Name><UserStyle><FeatureTypeStyle><Rule><PolygonSymbolizer><Fill><CssParameter name="fill">${fill}</CssParameter><CssParameter name="fill-opacity">${fillOpacity}</CssParameter></Fill><Stroke><CssParameter name="stroke">${stroke}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></PolygonSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
     }
 
-    function labelSld() {
-      return `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>codice_plla</Name><UserStyle><FeatureTypeStyle><Rule><MinScaleDenominator>20</MinScaleDenominator><MaxScaleDenominator>4000</MaxScaleDenominator><TextSymbolizer><Label><ogc:PropertyName>TESTO</ogc:PropertyName></Label><Font><CssParameter name="font-family">courier</CssParameter><CssParameter name="font-size">14</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>1.0</AnchorPointX><AnchorPointY>1.0</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Fill><CssParameter name="fill">#ffcc33</CssParameter></Fill></TextSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
+    function labelSld(color) {
+      return `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>codice_plla</Name><UserStyle><FeatureTypeStyle><Rule><MinScaleDenominator>20</MinScaleDenominator><MaxScaleDenominator>4000</MaxScaleDenominator><TextSymbolizer><Label><ogc:PropertyName>TESTO</ogc:PropertyName></Label><Font><CssParameter name="font-family">courier</CssParameter><CssParameter name="font-size">14</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>1.0</AnchorPointX><AnchorPointY>1.0</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Fill><CssParameter name="fill">${color}</CssParameter></Fill></TextSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
     }
 
-    function makeCadastreLayer(layerName, sldBody, pane) {
+    function parcelsSldBody() { return polygonSld("CP.CadastralParcel", prefs.parcels.color, prefs.parcels.color, "0", "1.5"); }
+    function buildingsSldBody() { return polygonSld("fabbricati", prefs.buildings.color, prefs.buildings.color, "0.34", "2.2"); }
+    function labelsSldBody() { return labelSld(prefs.labels.color); }
+
+    function makeCadastreLayer(layerName, sldBody, pane, opacity, minZoom) {
       return L.tileLayer.wms(WMS_URL, {
         layers: layerName, styles: "", format: "image/png", transparent: true, version: "1.1.1",
-        crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 16, maxZoom: 23,
+        crs: CATASTO_CRS, opacity, minZoom, maxZoom: 23,
         uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane, sld_body: sldBody
       });
     }
 
-    const parcelsLayer = makeCadastreLayer("CP.CadastralParcel", polygonSld("CP.CadastralParcel", "#ffffff", "#ffffff", "0", "1.5"), "parcelPane").addTo(map);
-    const buildingsLayer = makeCadastreLayer("fabbricati", polygonSld("fabbricati", "#7b1118", "#7b1118", "0.34", "2.2"), "buildingPane").addTo(map);
-    const labelsLayer = L.tileLayer.wms(WMS_URL, {
-      layers: "codice_plla", styles: "", format: "image/png", transparent: true, version: "1.1.1",
-      crs: CATASTO_CRS, opacity: Number(el.catastoOpacity.value), minZoom: 18, maxZoom: 23,
-      uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane: "labelPane", sld_body: labelSld()
-    }).addTo(map);
+    const parcelsLayer = makeCadastreLayer("CP.CadastralParcel", parcelsSldBody(), "parcelPane", prefs.parcels.opacity, 16);
+    const buildingsLayer = makeCadastreLayer("fabbricati", buildingsSldBody(), "buildingPane", prefs.buildings.opacity, 16);
+    const labelsLayer = makeCadastreLayer("codice_plla", labelsSldBody(), "labelPane", prefs.labels.opacity, 18);
 
     const isoipseLayer = L.layerGroup([], { pane: "isoipsePane" });
 
@@ -889,6 +981,7 @@
 
     function renderFiduciari(punti) {
       fiduciariLayer.clearLayers();
+      const { color, opacity } = prefs.fiduciali;
       for (const p of punti) {
         if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
         const marker = L.circleMarker([p.lat, p.lng], {
@@ -896,8 +989,8 @@
           radius: 5,
           color: "#001015",
           weight: 1.5,
-          fillColor: "#00f5ff",
-          fillOpacity: 0.95
+          fillColor: color,
+          fillOpacity: opacity
         });
         marker.bindPopup(buildFiduciariPopup(p));
         marker.addTo(fiduciariLayer);
@@ -961,6 +1054,7 @@
 
     function renderIsoipse(features) {
       isoipseLayer.clearLayers();
+      const { color, opacity } = prefs.isoipse;
       for (const f of features) {
         if (!f.geometry) continue;
         const q = f.properties && f.properties.cv_liv_q;
@@ -969,7 +1063,7 @@
 
         const group = L.geoJSON(f, {
           pane: "isoipsePane",
-          style: { color: "#a5ff2f", weight: 1.2, opacity: 0.9 }
+          style: { color, weight: 1.2, opacity }
         });
 
         if (label) {
@@ -1054,6 +1148,139 @@
         if (map.hasLayer(isoipseLayer)) map.removeLayer(isoipseLayer);
         isoipseLayer.clearLayers();
       }
+    }
+
+    function applyLayerPrefs(key) {
+      const p = prefs[key];
+      if (!p) return;
+      switch (key) {
+        case "google": googleSat.setOpacity(p.opacity); break;
+        case "bing": bingSat.setOpacity(p.opacity); break;
+        case "agea": ageaOrtofoto.setOpacity(p.opacity); break;
+        case "parcels":
+          parcelsLayer.setOpacity(p.opacity);
+          parcelsLayer.setParams({ sld_body: parcelsSldBody() });
+          break;
+        case "buildings":
+          buildingsLayer.setOpacity(p.opacity);
+          buildingsLayer.setParams({ sld_body: buildingsSldBody() });
+          break;
+        case "labels":
+          labelsLayer.setOpacity(p.opacity);
+          labelsLayer.setParams({ sld_body: labelsSldBody() });
+          break;
+        case "fiduciali":
+          fiduciariLayer.eachLayer(m => {
+            if (typeof m.setStyle === "function") m.setStyle({ fillColor: p.color, fillOpacity: p.opacity });
+          });
+          break;
+        case "isoipse":
+          document.documentElement.style.setProperty("--iso-color", p.color);
+          isoipseLayer.eachLayer(g => {
+            if (typeof g.eachLayer === "function") {
+              g.eachLayer(sub => { if (typeof sub.setStyle === "function") sub.setStyle({ color: p.color, opacity: p.opacity }); });
+            } else if (typeof g.setStyle === "function") {
+              g.setStyle({ color: p.color, opacity: p.opacity });
+            }
+          });
+          break;
+      }
+    }
+
+    const TOGGLE_FOR_KEY = {
+      google: () => el.toggleGoogle,
+      bing: () => el.toggleBing,
+      agea: () => el.toggleAgea,
+      parcels: () => el.toggleParcels,
+      buildings: () => el.toggleBuildings,
+      labels: () => el.toggleLabels,
+      fiduciali: () => el.toggleFiduciali,
+      isoipse: () => el.toggleIsoipse
+    };
+
+    const SIMPLE_LAYER_FOR_KEY = {
+      google: () => googleSat,
+      bing: () => bingSat,
+      agea: () => ageaOrtofoto,
+      parcels: () => parcelsLayer,
+      buildings: () => buildingsLayer,
+      labels: () => labelsLayer
+    };
+
+    function applyVisibilityFromPrefs() {
+      for (const key of ["google", "bing", "agea", "parcels", "buildings", "labels"]) {
+        const layer = SIMPLE_LAYER_FOR_KEY[key]();
+        const want = prefs[key].visible;
+        if (want && !map.hasLayer(layer)) map.addLayer(layer);
+        if (!want && map.hasLayer(layer)) map.removeLayer(layer);
+        TOGGLE_FOR_KEY[key]().checked = want;
+      }
+      el.toggleFiduciali.checked = prefs.fiduciali.visible;
+      if (prefs.fiduciali.visible) setFiduciariMode(true);
+      el.toggleIsoipse.checked = prefs.isoipse.visible;
+      if (prefs.isoipse.visible) setIsoipseMode(true);
+      document.documentElement.style.setProperty("--iso-color", prefs.isoipse.color);
+    }
+
+    function buildLayerSettingsUI() {
+      el.layerSettingsBody.innerHTML = "";
+      for (const meta of LAYER_META) {
+        const p = prefs[meta.key];
+        const row = document.createElement("div");
+        row.className = "ls-row";
+
+        const name = document.createElement("div");
+        name.className = "ls-name";
+        name.textContent = meta.name;
+        row.appendChild(name);
+
+        if (meta.hasColor) {
+          const color = document.createElement("input");
+          color.type = "color";
+          color.className = "ls-color";
+          color.value = p.color;
+          color.title = "Colore";
+          color.addEventListener("input", e => {
+            prefs[meta.key].color = e.target.value;
+            applyLayerPrefs(meta.key);
+            savePrefs();
+          });
+          row.appendChild(color);
+        } else {
+          const ph = document.createElement("div");
+          ph.className = "ls-color-placeholder";
+          row.appendChild(ph);
+        }
+
+        const op = document.createElement("input");
+        op.type = "range";
+        op.min = "0"; op.max = "1"; op.step = "0.05";
+        op.className = "ls-opacity";
+        op.value = p.opacity;
+        op.title = "Opacità";
+        const opVal = document.createElement("span");
+        opVal.className = "ls-opval";
+        opVal.textContent = `${Math.round(p.opacity * 100)}%`;
+        op.addEventListener("input", e => {
+          const v = Number(e.target.value);
+          prefs[meta.key].opacity = v;
+          opVal.textContent = `${Math.round(v * 100)}%`;
+          applyLayerPrefs(meta.key);
+          savePrefs();
+        });
+        row.appendChild(op);
+        row.appendChild(opVal);
+
+        el.layerSettingsBody.appendChild(row);
+      }
+    }
+
+    function openLayerSettings() {
+      buildLayerSettingsUI();
+      el.layerSettingsModal.classList.add("show");
+    }
+    function closeLayerSettings() {
+      el.layerSettingsModal.classList.remove("show");
     }
 
     function refreshMeasure() {
@@ -1349,7 +1576,6 @@
     function serializeState() {
       return {
         savedAt: new Date().toISOString(), center: map.getCenter(), zoom: map.getZoom(),
-        catastoOpacity: Number(el.catastoOpacity.value),
         imported: Array.from(state.imported.values()).map(item => ({ name: item.name, geojson: item.geojson, visible: item.visible }))
       };
     }
@@ -1359,8 +1585,6 @@
       for (const item of state.imported.values()) map.removeLayer(item.layer);
       state.imported.clear(); state.nextLayerId = 1;
       map.setView([saved.center.lat, saved.center.lng], saved.zoom);
-      el.catastoOpacity.value = saved.catastoOpacity ?? .78;
-      cadastreLayers.forEach(layer => layer.setOpacity(Number(el.catastoOpacity.value)));
       (saved.imported || []).forEach(item => addImportedLayer(item.name, item.geojson, item.visible !== false));
       el.offlineInfo.textContent = saved.savedAt ? `Aree KML salvate: ${new Date(saved.savedAt).toLocaleString("it-IT")}` : "";
     }
@@ -1442,19 +1666,37 @@
     el.panelBtn.addEventListener("click", () => el.drawer.classList.add("open"));
     el.closeDrawer.addEventListener("click", () => el.drawer.classList.remove("open"));
     el.closeIdentify.addEventListener("click", () => el.identifyBanner.classList.remove("show"));
-    el.toggleGoogle.addEventListener("change", e => setLayer(googleSat, e.target.checked));
-    el.toggleBing.addEventListener("change", e => setLayer(bingSat, e.target.checked));
-    el.toggleAgea.addEventListener("change", e => setLayer(ageaOrtofoto, e.target.checked));
-    el.toggleIsoipse.addEventListener("change", e => setIsoipseMode(e.target.checked));
-    el.toggleParcels.addEventListener("change", e => setLayer(parcelsLayer, e.target.checked));
-    el.toggleBuildings.addEventListener("change", e => setLayer(buildingsLayer, e.target.checked));
-    el.toggleLabels.addEventListener("change", e => setLayer(labelsLayer, e.target.checked));
-    el.toggleFiduciali.addEventListener("change", e => setFiduciariMode(e.target.checked));
+    function bindSimpleToggle(key, layer, toggleEl) {
+      toggleEl.addEventListener("change", e => {
+        const v = e.target.checked;
+        prefs[key].visible = v;
+        setLayer(layer, v);
+        savePrefs();
+      });
+    }
+    bindSimpleToggle("google", googleSat, el.toggleGoogle);
+    bindSimpleToggle("bing", bingSat, el.toggleBing);
+    bindSimpleToggle("agea", ageaOrtofoto, el.toggleAgea);
+    bindSimpleToggle("parcels", parcelsLayer, el.toggleParcels);
+    bindSimpleToggle("buildings", buildingsLayer, el.toggleBuildings);
+    bindSimpleToggle("labels", labelsLayer, el.toggleLabels);
+    el.toggleIsoipse.addEventListener("change", e => {
+      prefs.isoipse.visible = e.target.checked;
+      setIsoipseMode(e.target.checked);
+      savePrefs();
+    });
+    el.toggleFiduciali.addEventListener("change", e => {
+      prefs.fiduciali.visible = e.target.checked;
+      setFiduciariMode(e.target.checked);
+      savePrefs();
+    });
     map.on("moveend zoomend", () => { if (state.fiduciali.visible) scheduleFiduciariReload(); });
     map.on("moveend zoomend", () => { if (state.isoipse.visible) scheduleIsoipseReload(); });
-    el.catastoOpacity.addEventListener("input", e => {
-      const v = Number(e.target.value); cadastreLayers.forEach(l => l.setOpacity(v)); el.opacityValue.textContent = `${Math.round(v * 100)}%`;
-    });
+    el.openLayerSettings.addEventListener("click", openLayerSettings);
+    el.layerSettingsClose.addEventListener("click", closeLayerSettings);
+    el.layerSettingsModal.addEventListener("click", e => { if (e.target === el.layerSettingsModal) closeLayerSettings(); });
+
+    applyVisibilityFromPrefs();
     el.fileInput.addEventListener("change", e => importFiles(e.target.files));
     el.clearImported.addEventListener("click", clearImportedLayers);
     el.importedLayers.addEventListener("change", e => {

@@ -96,7 +96,7 @@ Pass-through proxy that fetches the URL server-side and returns the body, with p
 - **No comments in code unless the *why* is non-obvious.** The repo's existing code already follows this — keep it that way.
 - All UI strings are **in Italian**. So are commit messages and toasts.
 - Visual style is a deliberate **cyberpunk/HUD** look (neon cyan `#00f5ff`, danger pink `#ff2d6f`, lime `#a5ff2f`). CSS variables live at the top of the `<style>` block in `index.html`. Don't drift away from this palette without asking.
-- State persists in `localStorage` under key `quotazero_state_v1`. Offline tile cache uses the Cache API under name `quotazero-tiles-v1`. **Bump the version suffix** if you make a breaking change to either schema.
+- State persists in `localStorage` under key `quotazero_state_v1` (current map view + imported KMLs, saved by the "Salva area di rilievo" button). **Per-layer UI preferences** (visibility, opacity, color for each toggleable layer — google/bing/agea/parcels/buildings/labels/fiduciali/isoipse) persist independently under key `quotazero_prefs_v1`, auto-saved on every change via the "Personalizza colore e opacità" dialog or any toggle. Offline tile cache uses the Cache API under name `quotazero-tiles-v1`. **Bump the version suffix** if you make a breaking change to any of these schemas.
 - Layer z-index is managed via named Leaflet panes — see the array at ~line 581 of `index.html`. New raster layers should go in a dedicated pane, not the default one.
 
 ## Keeping the docs in sync
