@@ -39,6 +39,8 @@ Tieni premuto sulla mappa (o tasto destro su desktop) sopra una particella: l'ap
 ### Import dei rilievi
 Carica uno o più file **KML** o **GeoJSON**: vengono aggiunti come livelli indipendenti, attivabili/disattivabili singolarmente. I KML con più cartelle (`<Folder>`) vengono splittati automaticamente in un livello per cartella. Ogni punto del rilievo ha un popup con il link a Google Maps per la navigazione.
 
+Ogni livello con almeno **2 punti** mostra accanto al toggle un pulsante "percorso" (icona `alt_route`): genera un itinerario su **Google Maps** con i punti come waypoint **nell'ordine in cui appaiono nel KML** (perfetto per cartelle tipo *I USCITA / II USCITA* già ottimizzate). Come fermata di partenza viene usata la **posizione GPS corrente** se concessa, altrimenti il primo punto del rilievo. Se le fermate superano il limite di Google Maps (11 totali), il percorso viene **spezzato in più tratte**: ogni tratta riparte dall'ultima fermata della precedente, e un riquadro permette di aprire una tratta per volta in scheda separata.
+
 ### Strumenti sul campo
 - **Misura distanza**: tocchi successivi sulla mappa creano una polilinea con il totale in metri/km.
 - **La mia posizione (GPS)**: centra la mappa sulla posizione corrente con cerchio di accuratezza.

@@ -138,6 +138,22 @@
     .switch input:checked + span { background: var(--accent); }
     .switch input:checked + span:before { transform: translateX(18px); }
 
+    .row-actions { display: inline-flex; align-items: center; gap: 10px; }
+    .row-route-btn { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto; color: var(--accent); border: 1px solid var(--line); border-radius: 8px; background: var(--field); cursor: pointer; padding: 0; }
+    .row-route-btn:active { transform: scale(.94); }
+    .row-route-btn .icon { font-size: 20px; pointer-events: none; }
+
+    .route-modal { position: fixed; z-index: 1100; inset: 0; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(1,4,11,.65); backdrop-filter: blur(6px); }
+    .route-modal.show { display: flex; }
+    .route-modal-box { width: min(440px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel-solid); box-shadow: var(--shadow); padding: 18px; }
+    .route-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+    .route-modal-head h3 { margin: 0; color: var(--accent); font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .route-modal-close { width: 36px; height: 36px; display: grid; place-items: center; color: var(--ink); border: 1px solid rgba(255,255,255,.18); border-radius: 8px; background: rgba(255,255,255,.08); cursor: pointer; }
+    .route-modal-hint { margin: 0 0 6px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .route-leg { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.08); }
+    .route-leg-title { font-size: 14px; font-weight: 700; }
+    .route-leg-sub { margin-top: 3px; color: var(--muted); font-size: 12px; }
+
     .range-row { display: grid; grid-template-columns: minmax(0, 1fr) 42px; gap: 12px; align-items: center; padding: 6px 0 10px; }
     input[type=range] { width: 100%; accent-color: var(--accent); }
 
@@ -610,6 +626,17 @@
     </div>
   </div>
 
+  <div class="route-modal" id="routeModal" aria-hidden="true">
+    <div class="route-modal-box">
+      <div class="route-modal-head">
+        <h3 id="routeModalHeading">Percorso a tratte</h3>
+        <button class="route-modal-close" id="routeModalClose" aria-label="Chiudi"><span class="icon">close</span></button>
+      </div>
+      <p class="route-modal-hint">Il percorso supera il limite di Google Maps: ho diviso le fermate in più tratte. Ogni tratta riparte dall'ultimo punto della precedente.</p>
+      <div id="routeModalLegs"></div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
   <div class="hud-loader" id="hudLoader"><div class="spinner"></div><span>Elaborazione...</span></div>
   
@@ -686,6 +713,11 @@
       searchFoglio: document.getElementById("searchFoglio"),
       searchParticella: document.getElementById("searchParticella"),
       btnSearchParcel: document.getElementById("btnSearchParcel"),
+
+      routeModal: document.getElementById("routeModal"),
+      routeModalClose: document.getElementById("routeModalClose"),
+      routeModalHeading: document.getElementById("routeModalHeading"),
+      routeModalLegs: document.getElementById("routeModalLegs"),
 
       loader: document.getElementById("hudLoader")
     };
@@ -944,10 +976,26 @@
       layer.bindPopup(html);
     }
 
+    function extractWaypoints(geojson) {
+      if (!geojson) return [];
+      const features = geojson.type === "FeatureCollection" ? geojson.features : [geojson];
+      const pts = [];
+      for (const f of features) {
+        if (f?.geometry?.type === "Point") {
+          const [lng, lat] = f.geometry.coordinates;
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            pts.push({ lat, lng, name: f.properties?.name || "" });
+          }
+        }
+      }
+      return pts;
+    }
+
     function addImportedLayer(name, geojson, visible = true) {
       const id = `rilievo_${state.nextLayerId++}`;
       const layer = L.geoJSON(geojson, { style: featureStyle, pointToLayer: pointStyle, onEachFeature: bindFeaturePopup });
-      state.imported.set(id, { id, name, geojson, layer, visible });
+      const waypoints = extractWaypoints(geojson);
+      state.imported.set(id, { id, name, geojson, layer, visible, waypoints });
       if (visible) layer.addTo(map);
       renderImportedLayers();
       try { if(layer.getBounds().isValid()) map.fitBounds(layer.getBounds(), { padding: [28, 28], maxZoom: 19 }); } catch(e){}
@@ -959,6 +1007,10 @@
       if (!state.imported.size) { el.importedLayers.innerHTML = `<div class="empty">Nessun rilievo caricato</div>`; return; }
       for (const item of state.imported.values()) {
         const c = item.geojson.type === "FeatureCollection" ? item.geojson.features.length : 1;
+        const wpCount = item.waypoints?.length || 0;
+        const routeBtn = wpCount >= 2
+          ? `<button class="row-route-btn" data-route-id="${item.id}" title="Crea percorso Google Maps (${wpCount} punti)" aria-label="Crea percorso Google Maps"><span class="icon">alt_route</span></button>`
+          : "";
         const row = document.createElement("div");
         row.className = "row";
         row.innerHTML = `
@@ -966,11 +1018,90 @@
             <div class="row-title" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
             <div class="row-sub">${c} elementi</div>
           </div>
-          <label class="switch" title="Mostra/nascondi ${escapeHtml(item.name)}">
-            <input type="checkbox" ${item.visible ? "checked" : ""} data-layer-id="${item.id}"><span></span>
-          </label>`;
+          <div class="row-actions">
+            ${routeBtn}
+            <label class="switch" title="Mostra/nascondi ${escapeHtml(item.name)}">
+              <input type="checkbox" ${item.visible ? "checked" : ""} data-layer-id="${item.id}"><span></span>
+            </label>
+          </div>`;
         el.importedLayers.appendChild(row);
       }
+    }
+
+    const ROUTE_MAX_STOPS = 11;
+
+    function chunkRoute(stops) {
+      if (stops.length <= ROUTE_MAX_STOPS) return [stops];
+      const chunks = [];
+      let i = 0;
+      while (i < stops.length) {
+        const end = Math.min(i + ROUTE_MAX_STOPS, stops.length);
+        chunks.push(stops.slice(i, end));
+        if (end === stops.length) break;
+        i = end - 1;
+      }
+      return chunks;
+    }
+
+    function buildGoogleMapsUrl(stops) {
+      const origin = stops[0];
+      const destination = stops[stops.length - 1];
+      const waypoints = stops.slice(1, -1);
+      const params = new URLSearchParams();
+      params.set("api", "1");
+      params.set("origin", `${origin.lat},${origin.lng}`);
+      params.set("destination", `${destination.lat},${destination.lng}`);
+      if (waypoints.length) params.set("waypoints", waypoints.map(w => `${w.lat},${w.lng}`).join("|"));
+      params.set("travelmode", "driving");
+      return `https://www.google.com/maps/dir/?${params.toString()}`;
+    }
+
+    function getCurrentPositionPromise() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) { reject(new Error("Geolocation non disponibile")); return; }
+        navigator.geolocation.getCurrentPosition(
+          p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+          e => reject(e),
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+        );
+      });
+    }
+
+    function openRouteChooser(title, chunks) {
+      el.routeModalHeading.textContent = title;
+      el.routeModalLegs.innerHTML = "";
+      chunks.forEach((chunk, idx) => {
+        const row = document.createElement("div");
+        row.className = "route-leg";
+        row.innerHTML = `
+          <div>
+            <div class="route-leg-title">Tratta ${idx + 1}</div>
+            <div class="route-leg-sub">${chunk.length} fermate</div>
+          </div>
+          <a class="btn blue" href="${buildGoogleMapsUrl(chunk)}" target="_blank" rel="noopener"><span class="icon">navigation</span> Apri</a>`;
+        el.routeModalLegs.appendChild(row);
+      });
+      el.routeModal.classList.add("show");
+    }
+
+    async function openRouteForLayer(item) {
+      const wps = item.waypoints || [];
+      if (wps.length < 2) { toast("Servono almeno 2 punti per creare un percorso."); return; }
+      toast("Cerco la posizione GPS...");
+      let stops;
+      try {
+        const pos = await getCurrentPositionPromise();
+        stops = [pos, ...wps];
+      } catch {
+        toast("Posizione GPS non disponibile, parto dal primo punto del rilievo.", 3200);
+        stops = wps.slice();
+      }
+      const chunks = chunkRoute(stops);
+      if (chunks.length === 1) {
+        window.open(buildGoogleMapsUrl(chunks[0]), "_blank", "noopener");
+        return;
+      }
+      openRouteChooser(item.name, chunks);
     }
 
     function clearImportedLayers() {
@@ -1206,6 +1337,14 @@
       const id = e.target.dataset.layerId; if (!id) return;
       const item = state.imported.get(id); if (item) { item.visible = e.target.checked; setLayer(item.layer, item.visible); }
     });
+    el.importedLayers.addEventListener("click", e => {
+      const btn = e.target.closest("[data-route-id]");
+      if (!btn) return;
+      const item = state.imported.get(btn.dataset.routeId);
+      if (item) openRouteForLayer(item);
+    });
+    el.routeModalClose.addEventListener("click", () => el.routeModal.classList.remove("show"));
+    el.routeModal.addEventListener("click", e => { if (e.target === el.routeModal) el.routeModal.classList.remove("show"); });
     el.gpsBtn.addEventListener("click", geolocate);
     el.measureBtn.addEventListener("click", () => setMeasureMode(!state.measuring));
     el.toggleMeasure.addEventListener("change", e => setMeasureMode(e.target.checked));

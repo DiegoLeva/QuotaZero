@@ -12,6 +12,7 @@ A single-page web app for **cadastral field surveys** (rilievi catastali) in the
 - view the **Punti Fiduciali (TAF)** of the current viewport as a toggleable layer, with popup linking to the official AdE monografia PDF;
 - long-press the map to identify the parcel under the finger;
 - import field surveys (`.kml` / `.geojson`) and toggle them as layers;
+- launch a **Google Maps multi-waypoint route** for any imported layer (≥ 2 Points), starting from current GPS position and using the Points in KML order;
 - measure distances;
 - cache map tiles + KML state for **offline** use on site.
 
