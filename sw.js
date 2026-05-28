@@ -4,8 +4,7 @@ const TILE_HOST_PATTERNS = [
   /\.google\.com$/,
   /\.tiles\.virtualearth\.net$/,
   /^wms\.pcn\.minambiente\.it$/,
-  /^wms\.cartografia\.agenziaentrate\.gov\.it$/,
-  /^geoportale\.regione\.lazio\.it$/
+  /^wms\.cartografia\.agenziaentrate\.gov\.it$/
 ];
 
 function isTileRequest(url) {
