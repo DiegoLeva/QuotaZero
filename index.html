@@ -108,6 +108,37 @@
     .ls-color-placeholder { width: 34px; height: 28px; }
     .ls-opacity { width: 110px; }
     .ls-opval { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+    .ls-labels-toggle { display: flex; align-items: center; gap: 6px; padding-top: 6px; color: var(--muted); font-size: 12px; }
+    .ls-labels-toggle input[type=checkbox] { accent-color: var(--accent); }
+
+    .global-opacity-row {
+      display: flex; align-items: center; gap: 10px; padding: 10px 4px 4px;
+      border-top: 1px solid var(--line); margin-top: 8px;
+    }
+    .global-opacity-row .icon { color: var(--accent); font-size: 20px; }
+    .global-opacity-row input[type=range] { flex: 1; }
+    .global-opacity-row strong { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+    .bg-switcher { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .bg-opt {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 9px 6px; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--field); color: var(--ink); font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+    .bg-opt .icon { font-size: 16px; }
+    .bg-opt.active {
+      color: #001015;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-color: rgba(255,255,255,.5);
+    }
+
+    .zoom-badge {
+      width: 42px; height: 42px; display: grid; place-items: center;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+      color: var(--accent); font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums;
+      box-shadow: var(--shadow); margin-bottom: 6px; user-select: none; pointer-events: none;
+    }
 
     .icon {
       font-family: "Material Symbols Rounded"; font-weight: 500; font-style: normal;
@@ -503,7 +534,7 @@
       </section>
 
       <section class="section">
-        <div class="section-title">Ordine livelli</div>
+        <div class="section-title">Livelli</div>
         <div class="row">
           <div class="row-main">
             <div class="row-title">Numeri particelle</div>
@@ -546,36 +577,6 @@
         </div>
         <div class="row">
           <div class="row-main">
-            <div class="row-title">Satellite Google</div>
-            <div class="row-sub">Ortofoto ad alta risoluzione</div>
-          </div>
-          <label class="switch" title="Mostra/nascondi Google Satellite">
-            <input id="toggleGoogle" type="checkbox" checked>
-            <span></span>
-          </label>
-        </div>
-        <div class="row">
-          <div class="row-main">
-            <div class="row-title">Satellite Bing</div>
-            <div class="row-sub">Immagini Microsoft/Bing</div>
-          </div>
-          <label class="switch" title="Mostra/nascondi Bing Satellite">
-            <input id="toggleBing" type="checkbox">
-            <span></span>
-          </label>
-        </div>
-        <div class="row">
-          <div class="row-main">
-            <div class="row-title">Ortofoto AGEA 2012</div>
-            <div class="row-sub">Geoportale nazionale, copertura Lazio</div>
-          </div>
-          <label class="switch" title="Mostra/nascondi Ortofoto AGEA">
-            <input id="toggleAgea" type="checkbox">
-            <span></span>
-          </label>
-        </div>
-        <div class="row">
-          <div class="row-main">
             <div class="row-title">Isoipse (curve di livello)</div>
             <div class="row-sub">Geoportale Lazio, salto quota 5 m</div>
           </div>
@@ -584,9 +585,29 @@
             <span></span>
           </label>
         </div>
+        <div class="global-opacity-row">
+          <span class="icon">opacity</span>
+          <input id="globalOpacity" type="range" min="0" max="1" step="0.05" value="0.78" aria-label="Opacità globale dei livelli">
+          <strong id="globalOpacityValue">78%</strong>
+        </div>
         <button class="btn full" id="openLayerSettings" type="button" style="margin-top:8px">
           <span class="icon">tune</span> Personalizza colore e opacità
         </button>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Sfondo</div>
+        <div class="bg-switcher">
+          <button type="button" class="bg-opt" data-bg="google">
+            <span class="icon">satellite_alt</span> Google
+          </button>
+          <button type="button" class="bg-opt" data-bg="bing">
+            <span class="icon">satellite</span> Bing
+          </button>
+          <button type="button" class="bg-opt" data-bg="agea">
+            <span class="icon">terrain</span> AGEA
+          </button>
+        </div>
       </section>
 
       <section class="section">
@@ -714,25 +735,22 @@
     const TILE_CACHE = "quotazero-tiles-v1";
 
     const DEFAULT_PREFS = {
-      google:    { visible: true,  opacity: 1.00 },
-      bing:      { visible: false, opacity: 1.00 },
-      agea:      { visible: false, opacity: 1.00 },
-      parcels:   { visible: true,  opacity: 0.78, color: "#ffffff" },
-      buildings: { visible: true,  opacity: 0.78, color: "#7b1118" },
-      labels:    { visible: true,  opacity: 0.78, color: "#ffcc33" },
-      fiduciali: { visible: false, opacity: 0.95, color: "#00f5ff" },
-      isoipse:   { visible: false, opacity: 0.90, color: "#a5ff2f" }
+      background:    { active: "google", opacity: 1.00 },
+      globalOpacity: 0.78,
+      parcels:       { visible: true,  opacity: 1.00, color: "#ffffff" },
+      buildings:     { visible: true,  opacity: 1.00, color: "#7b1118" },
+      labels:        { visible: true,  opacity: 1.00, color: "#ffcc33" },
+      fiduciali:     { visible: false, opacity: 0.95, color: "#00f5ff" },
+      isoipse:       { visible: false, opacity: 1.00, color: "#a5ff2f", labels: true }
     };
 
     const LAYER_META = [
-      { key: "google",    name: "Satellite Google",   hasColor: false },
-      { key: "bing",      name: "Satellite Bing",     hasColor: false },
-      { key: "agea",      name: "Ortofoto AGEA 2012", hasColor: false },
-      { key: "parcels",   name: "Particelle",         hasColor: true  },
-      { key: "buildings", name: "Fabbricati",         hasColor: true  },
-      { key: "labels",    name: "Numeri particelle",  hasColor: true  },
-      { key: "fiduciali", name: "Punti Fiduciali",    hasColor: true  },
-      { key: "isoipse",   name: "Isoipse",            hasColor: true  }
+      { key: "background", name: "Sfondo satellite",  hasColor: false },
+      { key: "parcels",    name: "Particelle",        hasColor: true  },
+      { key: "buildings",  name: "Fabbricati",        hasColor: true  },
+      { key: "labels",     name: "Numeri particelle", hasColor: true  },
+      { key: "fiduciali",  name: "Punti Fiduciali",   hasColor: true  },
+      { key: "isoipse",    name: "Isoipse",           hasColor: true, hasLabelsToggle: true }
     ];
 
     function loadPrefs() {
@@ -742,7 +760,12 @@
         if (!raw) return merged;
         const stored = JSON.parse(raw);
         for (const k of Object.keys(merged)) {
-          if (stored[k] && typeof stored[k] === "object") Object.assign(merged[k], stored[k]);
+          if (stored[k] === undefined) continue;
+          if (typeof merged[k] === "object" && merged[k] !== null) {
+            if (typeof stored[k] === "object" && stored[k] !== null) Object.assign(merged[k], stored[k]);
+          } else {
+            merged[k] = stored[k];
+          }
         }
       } catch (e) { console.warn("Prefs load failed", e); }
       return merged;
@@ -771,17 +794,17 @@
       pressTimer: null,
       lastPressLatLng: null,
       fiduciali: { visible: false, loading: false, fetchAbort: null, debounceTimer: null },
-      isoipse: { visible: false, loading: false, fetchAbort: null, debounceTimer: null }
+      isoipse: { visible: false, loading: false, fetchAbort: null, debounceTimer: null, lastFeatures: [] }
     };
 
     const el = {
       drawer: document.getElementById("drawer"),
       panelBtn: document.getElementById("panelBtn"),
       closeDrawer: document.getElementById("closeDrawer"),
-      toggleGoogle: document.getElementById("toggleGoogle"),
-      toggleBing: document.getElementById("toggleBing"),
-      toggleAgea: document.getElementById("toggleAgea"),
       toggleIsoipse: document.getElementById("toggleIsoipse"),
+      globalOpacity: document.getElementById("globalOpacity"),
+      globalOpacityValue: document.getElementById("globalOpacityValue"),
+      bgOpts: Array.from(document.querySelectorAll(".bg-opt")),
       toggleParcels: document.getElementById("toggleParcels"),
       toggleBuildings: document.getElementById("toggleBuildings"),
       toggleLabels: document.getElementById("toggleLabels"),
@@ -839,6 +862,20 @@
       zoomSnap: 0.25
     }).setView([41.628856, 13.326394], 18);
 
+    const ZoomBadge = L.Control.extend({
+      options: { position: "topright" },
+      onAdd(m) {
+        const div = L.DomUtil.create("div", "zoom-badge");
+        div.id = "zoomBadge";
+        div.textContent = Math.round(m.getZoom());
+        return div;
+      }
+    });
+    new ZoomBadge().addTo(map);
+    map.on("zoomend zoom", () => {
+      const b = document.getElementById("zoomBadge");
+      if (b) b.textContent = Math.round(map.getZoom());
+    });
     L.control.zoom({ position: "topright" }).addTo(map);
     
     [
@@ -879,16 +916,18 @@
       subdomains: ["mt0", "mt1", "mt2", "mt3"],
       pane: "googlePane",
       attribution: "Google Satellite",
-      opacity: prefs.google.opacity
+      opacity: prefs.background.opacity
     });
 
-    const bingSat = new BingSatellite("", { maxZoom: 23, subdomains: ["0", "1", "2", "3"], pane: "bingPane", opacity: prefs.bing.opacity });
+    const bingSat = new BingSatellite("", { maxZoom: 23, subdomains: ["0", "1", "2", "3"], pane: "bingPane", opacity: prefs.background.opacity });
 
     const ageaOrtofoto = L.tileLayer.wms(PCN_AGEA_URL, {
       layers: "OI.ORTOIMMAGINI.2012.33", format: "image/jpeg", transparent: false, version: "1.3.0",
       crs: L.CRS.EPSG3857, maxZoom: 23, pane: "ageaPane", tileSize: 512, updateWhenIdle: true,
-      opacity: prefs.agea.opacity
+      opacity: prefs.background.opacity
     });
+
+    const BG_LAYERS = { google: googleSat, bing: bingSat, agea: ageaOrtofoto };
 
     function polygonSld(layerName, stroke, fill, fillOpacity, strokeWidth) {
       return `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><NamedLayer><Name>${layerName}</Name><UserStyle><FeatureTypeStyle><Rule><PolygonSymbolizer><Fill><CssParameter name="fill">${fill}</CssParameter><CssParameter name="fill-opacity">${fillOpacity}</CssParameter></Fill><Stroke><CssParameter name="stroke">${stroke}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></PolygonSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
@@ -910,9 +949,11 @@
       });
     }
 
-    const parcelsLayer = makeCadastreLayer("CP.CadastralParcel", parcelsSldBody(), "parcelPane", prefs.parcels.opacity, 16);
-    const buildingsLayer = makeCadastreLayer("fabbricati", buildingsSldBody(), "buildingPane", prefs.buildings.opacity, 16);
-    const labelsLayer = makeCadastreLayer("codice_plla", labelsSldBody(), "labelPane", prefs.labels.opacity, 18);
+    function effOpacity(key) { return prefs[key].opacity * prefs.globalOpacity; }
+
+    const parcelsLayer = makeCadastreLayer("CP.CadastralParcel", parcelsSldBody(), "parcelPane", effOpacity("parcels"), 16);
+    const buildingsLayer = makeCadastreLayer("fabbricati", buildingsSldBody(), "buildingPane", effOpacity("buildings"), 16);
+    const labelsLayer = makeCadastreLayer("codice_plla", labelsSldBody(), "labelPane", effOpacity("labels"), 18);
 
     const isoipseLayer = L.layerGroup([], { pane: "isoipsePane" });
 
@@ -1053,13 +1094,16 @@
     const ISOIPSE_MAX_FEATURES = 600;
 
     function renderIsoipse(features) {
+      state.isoipse.lastFeatures = features;
       isoipseLayer.clearLayers();
-      const { color, opacity } = prefs.isoipse;
+      const { color } = prefs.isoipse;
+      const opacity = effOpacity("isoipse");
+      const showLabels = prefs.isoipse.labels !== false;
       for (const f of features) {
         if (!f.geometry) continue;
         const q = f.properties && f.properties.cv_liv_q;
         const n = q == null ? NaN : parseFloat(q);
-        const label = Number.isFinite(n) ? `${Math.round(n)} m` : null;
+        const label = (showLabels && Number.isFinite(n)) ? `${Math.round(n)} m` : null;
 
         const group = L.geoJSON(f, {
           pane: "isoipsePane",
@@ -1151,75 +1195,78 @@
     }
 
     function applyLayerPrefs(key) {
+      if (key === "background") { applyBackground(); return; }
       const p = prefs[key];
       if (!p) return;
       switch (key) {
-        case "google": googleSat.setOpacity(p.opacity); break;
-        case "bing": bingSat.setOpacity(p.opacity); break;
-        case "agea": ageaOrtofoto.setOpacity(p.opacity); break;
         case "parcels":
-          parcelsLayer.setOpacity(p.opacity);
+          parcelsLayer.setOpacity(effOpacity("parcels"));
           parcelsLayer.setParams({ sld_body: parcelsSldBody() });
           break;
         case "buildings":
-          buildingsLayer.setOpacity(p.opacity);
+          buildingsLayer.setOpacity(effOpacity("buildings"));
           buildingsLayer.setParams({ sld_body: buildingsSldBody() });
           break;
         case "labels":
-          labelsLayer.setOpacity(p.opacity);
+          labelsLayer.setOpacity(effOpacity("labels"));
           labelsLayer.setParams({ sld_body: labelsSldBody() });
           break;
         case "fiduciali":
           fiduciariLayer.eachLayer(m => {
-            if (typeof m.setStyle === "function") m.setStyle({ fillColor: p.color, fillOpacity: p.opacity });
+            if (typeof m.setStyle === "function") m.setStyle({ fillColor: p.color, fillOpacity: effOpacity("fiduciali") });
           });
           break;
         case "isoipse":
           document.documentElement.style.setProperty("--iso-color", p.color);
           isoipseLayer.eachLayer(g => {
             if (typeof g.eachLayer === "function") {
-              g.eachLayer(sub => { if (typeof sub.setStyle === "function") sub.setStyle({ color: p.color, opacity: p.opacity }); });
+              g.eachLayer(sub => { if (typeof sub.setStyle === "function") sub.setStyle({ color: p.color, opacity: effOpacity("isoipse") }); });
             } else if (typeof g.setStyle === "function") {
-              g.setStyle({ color: p.color, opacity: p.opacity });
+              g.setStyle({ color: p.color, opacity: effOpacity("isoipse") });
             }
           });
           break;
       }
     }
 
-    const TOGGLE_FOR_KEY = {
-      google: () => el.toggleGoogle,
-      bing: () => el.toggleBing,
-      agea: () => el.toggleAgea,
-      parcels: () => el.toggleParcels,
-      buildings: () => el.toggleBuildings,
-      labels: () => el.toggleLabels,
-      fiduciali: () => el.toggleFiduciali,
-      isoipse: () => el.toggleIsoipse
-    };
+    function applyBackground() {
+      const active = prefs.background.active;
+      const op = prefs.background.opacity;
+      for (const [k, layer] of Object.entries(BG_LAYERS)) {
+        if (k === active) {
+          if (!map.hasLayer(layer)) map.addLayer(layer);
+          layer.setOpacity(op);
+        } else {
+          if (map.hasLayer(layer)) map.removeLayer(layer);
+        }
+      }
+      el.bgOpts.forEach(b => b.classList.toggle("active", b.dataset.bg === active));
+    }
 
-    const SIMPLE_LAYER_FOR_KEY = {
-      google: () => googleSat,
-      bing: () => bingSat,
-      agea: () => ageaOrtofoto,
-      parcels: () => parcelsLayer,
-      buildings: () => buildingsLayer,
-      labels: () => labelsLayer
-    };
+    function applyGlobalOpacity() {
+      ["parcels", "buildings", "labels", "fiduciali", "isoipse"].forEach(applyLayerPrefs);
+    }
 
     function applyVisibilityFromPrefs() {
-      for (const key of ["google", "bing", "agea", "parcels", "buildings", "labels"]) {
-        const layer = SIMPLE_LAYER_FOR_KEY[key]();
+      const layerToggles = {
+        parcels: parcelsLayer, buildings: buildingsLayer, labels: labelsLayer
+      };
+      for (const [key, layer] of Object.entries(layerToggles)) {
         const want = prefs[key].visible;
         if (want && !map.hasLayer(layer)) map.addLayer(layer);
         if (!want && map.hasLayer(layer)) map.removeLayer(layer);
-        TOGGLE_FOR_KEY[key]().checked = want;
       }
+      el.toggleParcels.checked = prefs.parcels.visible;
+      el.toggleBuildings.checked = prefs.buildings.visible;
+      el.toggleLabels.checked = prefs.labels.visible;
       el.toggleFiduciali.checked = prefs.fiduciali.visible;
       if (prefs.fiduciali.visible) setFiduciariMode(true);
       el.toggleIsoipse.checked = prefs.isoipse.visible;
       if (prefs.isoipse.visible) setIsoipseMode(true);
       document.documentElement.style.setProperty("--iso-color", prefs.isoipse.color);
+      el.globalOpacity.value = prefs.globalOpacity;
+      el.globalOpacityValue.textContent = `${Math.round(prefs.globalOpacity * 100)}%`;
+      applyBackground();
     }
 
     function buildLayerSettingsUI() {
@@ -1270,6 +1317,25 @@
         });
         row.appendChild(op);
         row.appendChild(opVal);
+
+        if (meta.hasLabelsToggle) {
+          const wrap = document.createElement("label");
+          wrap.className = "ls-labels-toggle";
+          wrap.style.gridColumn = "1 / -1";
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = p.labels !== false;
+          cb.addEventListener("change", e => {
+            prefs[meta.key].labels = e.target.checked;
+            savePrefs();
+            if (meta.key === "isoipse") renderIsoipse(state.isoipse.lastFeatures || []);
+          });
+          const lbl = document.createElement("span");
+          lbl.textContent = "Mostra valori di quota lungo le curve";
+          wrap.appendChild(cb);
+          wrap.appendChild(lbl);
+          row.appendChild(wrap);
+        }
 
         el.layerSettingsBody.appendChild(row);
       }
@@ -1674,12 +1740,25 @@
         savePrefs();
       });
     }
-    bindSimpleToggle("google", googleSat, el.toggleGoogle);
-    bindSimpleToggle("bing", bingSat, el.toggleBing);
-    bindSimpleToggle("agea", ageaOrtofoto, el.toggleAgea);
     bindSimpleToggle("parcels", parcelsLayer, el.toggleParcels);
     bindSimpleToggle("buildings", buildingsLayer, el.toggleBuildings);
     bindSimpleToggle("labels", labelsLayer, el.toggleLabels);
+
+    el.bgOpts.forEach(btn => btn.addEventListener("click", () => {
+      const v = btn.dataset.bg;
+      if (!BG_LAYERS[v]) return;
+      prefs.background.active = v;
+      applyBackground();
+      savePrefs();
+    }));
+
+    el.globalOpacity.addEventListener("input", e => {
+      const v = Number(e.target.value);
+      prefs.globalOpacity = v;
+      el.globalOpacityValue.textContent = `${Math.round(v * 100)}%`;
+      applyGlobalOpacity();
+      savePrefs();
+    });
     el.toggleIsoipse.addEventListener("change", e => {
       prefs.isoipse.visible = e.target.checked;
       setIsoipseMode(e.target.checked);
