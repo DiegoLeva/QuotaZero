@@ -169,11 +169,10 @@
       border: 1px solid var(--line); border-radius: 10px;
       background: linear-gradient(135deg, rgba(0,245,255,.16), transparent 40%), linear-gradient(315deg, rgba(255,45,111,.12), transparent 30%), var(--panel-solid);
       box-shadow: var(--shadow); backdrop-filter: blur(18px);
-      clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
     }
     .comune-search.show { transform: translateX(-50%) translateY(0); }
     .comune-search-body { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
-    .comune-search-body > .icon { color: var(--accent); text-shadow: 0 0 12px var(--accent); font-size: 22px; flex: 0 0 auto; }
+    .comune-search-body > .icon { color: var(--accent); text-shadow: 0 0 12px var(--accent); font-size: 22px; flex: 0 0 auto; pointer-events: none; }
     .comune-search input {
       flex: 1 1 auto; min-width: 0; min-height: 38px;
       padding: 0 10px;
@@ -186,6 +185,7 @@
       color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
       background: var(--field);
     }
+    .comune-search-go .icon, .comune-search-close .icon { pointer-events: none; }
     .comune-search-go { color: #001015; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; }
     .comune-search-go:active, .comune-search-close:active { transform: scale(.94); }
 
@@ -520,8 +520,8 @@
       <span class="icon" aria-hidden="true">location_city</span>
       <input id="comuneSearchInput" type="text" list="comuneSearchList" placeholder="Cerca comune..." autocomplete="off" spellcheck="false">
       <datalist id="comuneSearchList"></datalist>
-      <button class="comune-search-go" id="comuneSearchGo" title="Vai" aria-label="Vai"><span class="icon">arrow_forward</span></button>
-      <button class="comune-search-close" id="comuneSearchClose" title="Chiudi" aria-label="Chiudi"><span class="icon">close</span></button>
+      <button type="button" class="comune-search-go" id="comuneSearchGo" title="Vai" aria-label="Vai"><span class="icon">arrow_forward</span></button>
+      <button type="button" class="comune-search-close" id="comuneSearchClose" title="Chiudi" aria-label="Chiudi"><span class="icon">close</span></button>
     </div>
   </div>
 
@@ -1113,6 +1113,7 @@
         toast("Comune non valido. Scegli dalla lista.");
         return;
       }
+      closeComuneSearch();
       el.loader.classList.add("active");
       toast(`Cerco ${match.name}...`);
       try {
@@ -1120,7 +1121,6 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Comune non trovato.");
         map.setView(data.centro, 16, { animate: true, duration: 1.2 });
-        closeComuneSearch();
         toast(`Centrato su ${match.name}`);
       } catch (err) {
         toast(err.message, 4000);
