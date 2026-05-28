@@ -316,7 +316,7 @@
   
   <div class="top-center">
     <div class="status-pill">
-      <strong>Quota zero</strong>
+      <strong>QuotaZero</strong>
     </div>
   </div>
 
@@ -618,8 +618,8 @@
     const PCN_AGEA_URL = "https://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_12.map";
     const CATASTO_CRS = L.extend({}, L.CRS.EPSG4326, { code: "EPSG:4258" });
     const CATASTO_TILE_SIZE = 512;
-    const STORAGE_KEY = "georilievo_pro_state_v3";
-    const TILE_CACHE = "georilievo-pro-tiles-v2";
+    const STORAGE_KEY = "quotazero_state_v1";
+    const TILE_CACHE = "quotazero-tiles-v1";
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(err => console.warn("SW register failed", err));

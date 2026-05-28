@@ -24,7 +24,7 @@ export default async function handler(req, res) {
 
   try {
     const r = await fetch(resultUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; AppRilieviPro)" }
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; QuotaZero)" }
     });
     if (!r.ok) throw new Error(`Portale AdE: HTTP ${r.status}`);
     const html = await r.text();

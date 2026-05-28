@@ -1,4 +1,4 @@
-# App Rilievi Pro
+# QuotaZero
 
 Web-app per **rilievi catastali sul campo** nella provincia di Frosinone (Lazio).
 
@@ -212,7 +212,7 @@ Push sul branch principale: Vercel costruisce e pubblica automaticamente. Niente
 
 - Il catasto AdE è lento e rate-limited: usalo con moderazione, evita di richiederlo a ogni movimento della mappa.
 - La cache offline è limitata a circa **1200 tasselli** per non saturare lo storage del browser. È sufficiente per qualche kmq a zoom 17–18.
-- Le chiavi di `localStorage` (`georilievo_pro_state_v3`) e di Cache API (`georilievo-pro-tiles-v2`) sono versionate: cambia il suffisso se modifichi lo schema dello stato salvato, altrimenti i vecchi dispositivi si rompono.
+- Le chiavi di `localStorage` (`quotazero_state_v1`) e di Cache API (`quotazero-tiles-v1`) sono versionate: cambia il suffisso se modifichi lo schema dello stato salvato, altrimenti i vecchi dispositivi si rompono.
 
 ---
 

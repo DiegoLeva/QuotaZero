@@ -1,4 +1,4 @@
-const TILE_CACHE = "georilievo-pro-tiles-v2";
+const TILE_CACHE = "quotazero-tiles-v1";
 
 const TILE_HOST_PATTERNS = [
   /\.google\.com$/,
