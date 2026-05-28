@@ -422,6 +422,16 @@
         </div>
         <div class="row">
           <div class="row-main">
+            <div class="row-title">Punti Fiduciali</div>
+            <div class="row-sub">Monografie TAF del comune selezionato</div>
+          </div>
+          <label class="switch" title="Mostra/nascondi punti fiduciali">
+            <input id="toggleFiduciali" type="checkbox">
+            <span></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="row-main">
             <div class="row-title">Particelle</div>
             <div class="row-sub">Confini catastali in bianco, zoom 16+</div>
           </div>
@@ -555,6 +565,7 @@
   <script>
     const WMS_URL = "https://wms.cartografia.agenziaentrate.gov.it/inspire/wms/ows01.php";
     const PCN_AGEA_URL = "https://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_12.map";
+    const MONOGRAFIA_BASE = "https://www1.agenziaentrate.gov.it/servizi/Monografie/download.php?key=7000001747634&fs=15&dir=1229&namefile=";
     const CATASTO_CRS = L.extend({}, L.CRS.EPSG4326, { code: "EPSG:4258" });
     const CATASTO_TILE_SIZE = 512;
     const STORAGE_KEY = "georilievo_pro_state_v3";
@@ -570,7 +581,8 @@
       measureLine: null,
       userMarker: null,
       pressTimer: null,
-      lastPressLatLng: null
+      lastPressLatLng: null,
+      fiduciali: { visible: false, loadedComune: null, loading: false }
     };
 
     const el = {
@@ -583,6 +595,7 @@
       toggleParcels: document.getElementById("toggleParcels"),
       toggleBuildings: document.getElementById("toggleBuildings"),
       toggleLabels: document.getElementById("toggleLabels"),
+      toggleFiduciali: document.getElementById("toggleFiduciali"),
       catastoOpacity: document.getElementById("catastoOpacity"),
       opacityValue: document.getElementById("opacityValue"),
       fileInput: document.getElementById("fileInput"),
@@ -636,6 +649,7 @@
       ["googlePane", 200],
       ["parcelPane", 420],
       ["buildingPane", 440],
+      ["fiduciariPane", 460],
       ["labelPane", 470]
     ].forEach(([name, zIndex]) => {
       map.createPane(name);
@@ -699,6 +713,8 @@
       uppercase: true, tiled: true, tileSize: CATASTO_TILE_SIZE, pane: "labelPane", sld_body: labelSld()
     }).addTo(map);
 
+    const fiduciariLayer = L.layerGroup([], { pane: "fiduciariPane" });
+
     const cadastreLayers = [parcelsLayer, buildingsLayer, labelsLayer];
     let catastoTileErrors = 0;
     cadastreLayers.forEach(layer => {
@@ -736,6 +752,80 @@
       el.identifyBtn.classList.toggle("active", active);
       el.toggleIdentify.checked = active;
       if (active) toast("Interrogazione catasto attiva: tieni premuto su una particella.");
+    }
+
+    function buildFiduciariPopup(p) {
+      const codice = escapeHtml(p.codice || "Punto fiduciale");
+      const desc = p.descrizione ? `<div class="row-sub" style="margin-bottom:6px;">${escapeHtml(p.descrizione)}</div>` : "";
+      const foglioTxt = p.foglio ? `${escapeHtml(p.foglio)}${p.allegato ? escapeHtml(p.allegato) : ""}` : "-";
+      const particellaTxt = p.particella ? escapeHtml(p.particella) : "-";
+      const meta = `<div class="row-sub">Foglio: ${foglioTxt}<br>Particella: ${particellaTxt}</div>`;
+      const navHref = `https://maps.google.com/?q=${p.lat},${p.lng}`;
+      let pdfBtn = "";
+      if (p.namefile) {
+        const pdfHref = MONOGRAFIA_BASE + encodeURIComponent(p.namefile);
+        pdfBtn = `<a class="btn warn" href="${pdfHref}" target="_blank" rel="noopener"><span class="icon">picture_as_pdf</span> Monografia</a>`;
+      }
+      return `
+        <div class="popup-title" style="color:#00f5ff;font-weight:800;margin-bottom:4px;">${codice}</div>
+        ${desc}
+        ${meta}
+        <div class="popup-actions">
+          <a class="btn blue" href="${navHref}" target="_blank" rel="noopener"><span class="icon">navigation</span> Naviga</a>
+          ${pdfBtn}
+        </div>`;
+    }
+
+    function renderFiduciari(punti) {
+      fiduciariLayer.clearLayers();
+      for (const p of punti) {
+        if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
+        const marker = L.circleMarker([p.lat, p.lng], {
+          pane: "fiduciariPane",
+          radius: 5,
+          color: "#001015",
+          weight: 1.5,
+          fillColor: "#00f5ff",
+          fillOpacity: 0.95
+        });
+        marker.bindPopup(buildFiduciariPopup(p));
+        marker.addTo(fiduciariLayer);
+      }
+    }
+
+    async function loadFiduciari(comune) {
+      if (!comune) {
+        fiduciariLayer.clearLayers();
+        state.fiduciali.loadedComune = null;
+        toast("Seleziona un comune nella ricerca per vedere i punti fiduciali.");
+        return;
+      }
+      if (state.fiduciali.loadedComune === comune && fiduciariLayer.getLayers().length > 0) return;
+      state.fiduciali.loading = true;
+      try {
+        const res = await fetch(`/api/punti-fiduciali?comune=${encodeURIComponent(comune)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Errore caricamento punti fiduciali.");
+        renderFiduciari(data.punti || []);
+        state.fiduciali.loadedComune = comune;
+        toast(`${(data.punti || []).length} punti fiduciali per ${comune}.`);
+      } catch (err) {
+        console.error("Errore Punti Fiduciali:", err);
+        toast("Impossibile caricare i punti fiduciali.");
+      } finally {
+        state.fiduciali.loading = false;
+      }
+    }
+
+    function setFiduciariMode(visible) {
+      state.fiduciali.visible = visible;
+      el.toggleFiduciali.checked = visible;
+      if (visible) {
+        if (!map.hasLayer(fiduciariLayer)) map.addLayer(fiduciariLayer);
+        loadFiduciari(el.searchComune.value);
+      } else {
+        if (map.hasLayer(fiduciariLayer)) map.removeLayer(fiduciariLayer);
+      }
     }
 
     function refreshMeasure() {
@@ -990,6 +1080,10 @@
     el.toggleParcels.addEventListener("change", e => setLayer(parcelsLayer, e.target.checked));
     el.toggleBuildings.addEventListener("change", e => setLayer(buildingsLayer, e.target.checked));
     el.toggleLabels.addEventListener("change", e => setLayer(labelsLayer, e.target.checked));
+    el.toggleFiduciali.addEventListener("change", e => setFiduciariMode(e.target.checked));
+    el.searchComune.addEventListener("change", () => {
+      if (state.fiduciali.visible) loadFiduciari(el.searchComune.value);
+    });
     el.catastoOpacity.addEventListener("input", e => {
       const v = Number(e.target.value); cadastreLayers.forEach(l => l.setOpacity(v)); el.opacityValue.textContent = `${Math.round(v * 100)}%`;
     });
@@ -1126,6 +1220,10 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Comune non trovato.");
         map.setView(data.centro, 16, { animate: true, duration: 1.2 });
+        if (el.searchComune.value !== match.code) {
+          el.searchComune.value = match.code;
+          if (state.fiduciali.visible) loadFiduciari(match.code);
+        }
         toast(`Centrato su ${match.name}`);
       } catch (err) {
         toast(err.message, 4000);
