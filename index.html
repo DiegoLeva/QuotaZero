@@ -244,6 +244,24 @@
 
     .gandalf-overlay { pointer-events: none; image-rendering: auto; }
 
+    .intro-anim-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9000;
+      overflow: hidden;
+    }
+    .intro-anim-layer img,
+    .intro-anim-layer canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 50% 50%;
+      image-rendering: auto;
+      will-change: transform, width, height;
+    }
+    .intro-anim-layer .intro-explosion { display: none; }
+
     .leaflet-tooltip.gandalf-bubble {
       position: relative;
       padding: 10px 18px;
@@ -2089,6 +2107,166 @@
     }
 
     updateGandalf();
+
+    function runIntroAnimation() {
+      const target = L.latLng(41.628856, 13.326394);
+      const DEFAULT_ZOOM = 18;
+      const PLANE_SIZE = 60;
+      const EXPLOSION_SIZE = 200;
+      const IS_MOBILE = window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+      const DURATION = IS_MOBILE ? 2600 : 4000;
+      const EXPLOSION_LIFETIME = 1500;
+      const EXPLOSION_SLOW_FACTOR = 2.5;
+      const EXPLOSION_LEAD_T = 0.88;
+      const APPROACH_ANGLES = [-130, 10, 140];
+      const TARGET_Y_OFFSET = -30;
+
+      const mapSize = map.getSize();
+      const offset = Math.hypot(mapSize.x, mapSize.y) * 0.65;
+      const rawTargetPt = map.latLngToContainerPoint(target);
+      const targetPt = L.point(rawTargetPt.x, rawTargetPt.y + TARGET_Y_OFFSET);
+
+      const layer = document.createElement('div');
+      layer.className = 'intro-anim-layer';
+      map.getContainer().appendChild(layer);
+
+      const stamp = Date.now();
+      const planes = APPROACH_ANGLES.map((deg, i) => {
+        const rad = deg * Math.PI / 180;
+        const startX = targetPt.x + Math.sin(rad) * offset;
+        const startY = targetPt.y - Math.cos(rad) * offset;
+        const startLatLng = map.containerPointToLatLng(L.point(startX, startY));
+        const dx = targetPt.x - startX;
+        const dy = targetPt.y - startY;
+        const angle = Math.atan2(dx, -dy) * 180 / Math.PI;
+        const img = document.createElement('img');
+        img.src = 'airplane.gif?t=' + stamp + '-' + i;
+        img.className = 'intro-airplane';
+        img.alt = '';
+        layer.appendChild(img);
+        return { img, startLatLng, angle };
+      });
+
+      const explosionCanvas = document.createElement('canvas');
+      explosionCanvas.className = 'intro-explosion';
+      layer.appendChild(explosionCanvas);
+      let explosion = explosionCanvas;
+
+      const sizeScale = () => Math.pow(2, map.getZoom() - DEFAULT_ZOOM);
+      let planesActive = true;
+      let explosionStarted = false;
+      const t0 = performance.now();
+
+      function render() {
+        const scale = sizeScale();
+        const rtp = map.latLngToContainerPoint(target);
+        const tp = L.point(rtp.x, rtp.y + TARGET_Y_OFFSET);
+        if (planesActive) {
+          const ps = PLANE_SIZE * scale;
+          const t = Math.min(1, (performance.now() - t0) / DURATION);
+          planes.forEach(p => {
+            const sp = map.latLngToContainerPoint(p.startLatLng);
+            const x = sp.x + (tp.x - sp.x) * t;
+            const y = sp.y + (tp.y - sp.y) * t;
+            p.img.style.width = ps + 'px';
+            p.img.style.height = ps + 'px';
+            p.img.style.transform = `translate(${x - ps/2}px, ${y - ps/2}px) rotate(${p.angle}deg)`;
+          });
+        }
+        if (explosionStarted) {
+          const es = EXPLOSION_SIZE * scale;
+          explosion.style.width = es + 'px';
+          explosion.style.height = es + 'px';
+          explosion.style.transform = `translate(${tp.x - es/2}px, ${tp.y - es/2}px)`;
+        }
+      }
+
+      function tick() {
+        const t = (performance.now() - t0) / DURATION;
+        if (!explosionStarted && t >= EXPLOSION_LEAD_T) {
+          explosionStarted = true;
+          explosion.style.display = 'block';
+          startExplosion();
+        }
+        if (t >= 1 && planesActive) {
+          planesActive = false;
+          planes.forEach(p => p.img.remove());
+          render();
+          return;
+        }
+        render();
+        requestAnimationFrame(tick);
+      }
+
+      function cleanup() {
+        map.off('zoom move', render);
+        if (layer.parentNode) layer.remove();
+      }
+
+      function fallbackExplosion() {
+        const img = document.createElement('img');
+        img.className = 'intro-explosion';
+        img.alt = '';
+        img.src = 'explosion.gif?t=' + Date.now();
+        img.style.display = 'block';
+        explosion.replaceWith(img);
+        explosion = img;
+        render();
+        setTimeout(cleanup, EXPLOSION_LIFETIME);
+      }
+
+      async function playSlowGif(canvas, url, slow) {
+        if (typeof ImageDecoder === 'undefined') return false;
+        try {
+          const ok = await ImageDecoder.isTypeSupported('image/gif');
+          if (!ok) return false;
+        } catch (e) { return false; }
+        let buffer;
+        try {
+          const resp = await fetch(url);
+          buffer = await resp.arrayBuffer();
+        } catch (e) { return false; }
+        let decoder;
+        try {
+          decoder = new ImageDecoder({ data: buffer, type: 'image/gif' });
+          await decoder.tracks.ready;
+          await decoder.completed;
+        } catch (e) { return false; }
+        const frameCount = decoder.tracks.selectedTrack.frameCount;
+        const ctx = canvas.getContext('2d');
+        for (let i = 0; i < frameCount; i++) {
+          let frame;
+          try { frame = await decoder.decode({ frameIndex: i }); }
+          catch (e) { break; }
+          const img = frame.image;
+          if (i === 0) {
+            canvas.width = img.displayWidth;
+            canvas.height = img.displayHeight;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          const delayMs = ((img.duration || 100000) / 1000) * slow;
+          img.close();
+          await new Promise(r => setTimeout(r, delayMs));
+        }
+        return true;
+      }
+
+      function startExplosion() {
+        playSlowGif(explosionCanvas, 'explosion.gif?t=' + Date.now(), EXPLOSION_SLOW_FACTOR)
+          .then(ok => {
+            if (ok) setTimeout(cleanup, 150);
+            else fallbackExplosion();
+          })
+          .catch(() => fallbackExplosion());
+      }
+
+      map.on('zoom move', render);
+      render();
+      requestAnimationFrame(tick);
+    }
+
+    map.whenReady(runIntroAnimation);
   </script>
 </body>
 </html>
