@@ -16,6 +16,7 @@ L'interfaccia è in stile HUD/cyberpunk (cyan neon, rosa, lime) con tutti i coma
   - **Particelle** (confini in bianco)
   - **Fabbricati** (sagome in rosso scuro)
   - **Numeri particella** (etichette gialle, visibili da zoom 18 in su)
+- **Punti Fiduciali (TAF)**: layer attivabile che mostra i punti fiduciali del Catasto sotto forma di pallini cyan, caricati dinamicamente in base al viewport (zoom minimo 14). Il popup di ogni punto mostra `Codice PF`, descrizione, foglio/particella e include due bottoni: **Naviga** (Google Maps) e **Monografia** (apre il PDF ufficiale dell'Agenzia delle Entrate in una nuova scheda — vedi nota sotto).
 - Slider per regolare l'opacità del catasto.
 - Il catasto risponde solo a scala alta: i livelli si attivano automaticamente da zoom 16.
 
@@ -26,6 +27,11 @@ Dal pannello laterale si sceglie il **Comune** della provincia di Frosinone (tut
 2. centra la mappa sul centroide della particella;
 3. disegna il poligono reale (non solo un marker) in rosa neon sopra la mappa;
 4. mostra un popup con il riepilogo.
+
+C'è anche un pulsante separato **Vai al comune** che apre una ricerca per nome del comune e centra la mappa sul centroide complessivo.
+
+### Monografie Punti Fiduciali
+Il bottone "Monografia" del popup dei punti fiduciali non punta direttamente al PDF dell'Agenzia delle Entrate: il portale AdE genera la `key` di download dinamicamente per ogni sessione, quindi gli URL salvati nel GeoJSON di partenza sono già scaduti. Il bottone passa quindi per l'endpoint serverless `/api/monografia`, che fa scraping di `risultato.php` (pubblico, GET, senza cookies), estrae la key fresca e redireziona via HTTP 302 al PDF corretto. Tempo tipico: 0.5–1 s.
 
 ### Interrogazione interattiva
 Tieni premuto sulla mappa (o tasto destro su desktop) sopra una particella: l'app interroga il WMS dell'Agenzia delle Entrate e mostra in un banner i dati di **Comune / Foglio / Particella**.
@@ -44,8 +50,12 @@ Carica uno o più file **KML** o **GeoJSON**: vengono aggiunti come livelli indi
 
 ```
 index.html                      # Tutta l'app frontend (vanilla JS + Leaflet)
-api/cerca-particella.js         # Funzione serverless: query spaziale PostGIS
-api/wms-proxy.js                # Funzione serverless: proxy CORS per il WMS catastale
+api/cerca-particella.js         # serverless: centroide di una particella (PostGIS)
+api/cerca-comune.js             # serverless: centroide complessivo di un comune
+api/punti-fiduciali.js          # serverless: punti fiduciali per bbox/comune
+api/monografia.js               # serverless: risolve l'URL PDF AdE via scraping
+api/wms-proxy.js                # serverless: proxy CORS per il WMS catastale
+scripts/import-fiduciali.mjs    # importer one-shot del GeoJSON TAF nel DB
 package.json
 ```
 
@@ -61,7 +71,8 @@ package.json
 | WMS Geoportale Nazionale (`wms.pcn.minambiente.it`) | Ortofoto AGEA 2012 |
 | Google Satellite tiles | Sfondo satellitare principale |
 | Bing/Virtual Earth tiles | Sfondo satellitare alternativo |
-| Neon Postgres + PostGIS | Ricerca particella per Foglio/Numero |
+| Neon Postgres + PostGIS | Ricerca particella, ricerca comune, punti fiduciali |
+| Portale Monografie AdE (`www1.agenziaentrate.gov.it/servizi/Monografie/`) | Scraping HTML per risolvere l'URL del PDF della monografia di un PF |
 
 ---
 
@@ -155,6 +166,38 @@ Cosa fa lo script, in breve:
 - appende le righe nella tabella `particelle_catastali` (già creata dallo schema SQL).
 
 Da rilanciare quando si aggiunge un Comune nuovo o quando l'Agenzia delle Entrate pubblica un aggiornamento dei GML.
+
+### Tabella e import dei Punti Fiduciali
+
+I Punti Fiduciali (TAF — Trigonometric & Anchor Frame) partono da un GeoJSON fornito a parte (es. `TAF_Punti_Fiduciali.geojson`). Tabella:
+
+```sql
+CREATE TABLE IF NOT EXISTS punti_fiduciali (
+  codice_pf   text PRIMARY KEY,        -- es. "PF05/0010/A032"
+  comune      text NOT NULL,           -- codice Belfiore, es. "A032"
+  foglio      text,
+  allegato    text,
+  particella  text,
+  descrizione text,
+  namefile    text,                    -- solo il "namefile" dell'URL AdE, es. "A032-0010-05"
+  geom        geography(Point, 4326)
+);
+
+CREATE INDEX IF NOT EXISTS punti_fiduciali_geom_idx ON punti_fiduciali USING GIST (geom);
+CREATE INDEX IF NOT EXISTS punti_fiduciali_comune_idx ON punti_fiduciali (comune);
+```
+
+Lo schema viene creato automaticamente dallo script di import. Per popolare:
+
+```powershell
+npm install
+$env:DATABASE_URL = "postgresql://...la tua connection string Neon..."
+node scripts/import-fiduciali.mjs "C:\path\TAF_Punti_Fiduciali.geojson"
+```
+
+Lo script tronca la tabella e reinserisce in batch da 500. Salva **solo il `namefile`** (parte variabile dell'URL AdE), non l'URL intero: vedi più sotto perché.
+
+> **Perché non salvare l'URL completo.** Nel GeoJSON ufficiale del TAF il campo `Download` è un URL del tipo `download.php?key=NNN&fs=15&dir=NNN&namefile=…`. La `key` è generata dal portale AdE per ogni sessione di ricerca: il file salvato ha la key valida solo al momento della generazione, dopo poco tempo il server la ignora e serve un PDF di fallback. L'URL viene quindi **ricostruito al volo dal backend** (`/api/monografia`) facendo scraping di `risultato.php`, che è pubblico e accetta `GET` senza cookies.
 
 ---
 
