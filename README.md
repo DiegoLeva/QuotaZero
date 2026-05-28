@@ -44,15 +44,19 @@ Oltre ai Punti Fiduciali ufficiali (TAF, sola lettura) puoi **creare i tuoi PF**
 4. **Salva**: il punto viene registrato sul DB (posizione, nome, comune, progressivo, data/ora). Le foto **non** vanno sul DB, restano in memoria nella sessione corrente.
 
 Cliccando un punto già salvato si apre un mini-popup con tre azioni:
-- **Modifica** — riapre la modale per cambiare nome/foto;
+- **Modifica** — riapre la modale per cambiare nome/foto. Da qui un pulsante **Sposta** riporta alla fase di piazzamento col mirino (mantenendo le foto): all'OK aggiorna le coordinate e ricalcola comune/foglio/particella e l'eventuale nome automatico;
 - **Scarica** — genera al volo un **pacchetto ZIP** (vedi sotto);
 - **Elimina** — rimuove il punto anche dal DB, previa conferma.
+
+Se non si inserisce un nome, la casella viene pre-compilata con un nome automatico `PF foglio-particella`.
 
 Il pacchetto ZIP si chiama `{codice comune}PF_{progressivo} - {lat},{lng}.zip` (il progressivo conta solo i punti aggiunti da noi per quel comune) e contiene:
 - `metadata.txt` — nome, comune, foglio, particella, coordinate, progressivo, data/ora;
 - le **foto** scattate, se presenti nella sessione;
 - `ortofoto_1000.jpg` — ritaglio di ortofoto satellitare centrato sul punto, quadrato 1772×1772 px (≈ scala 1:1000, ~150 m di lato);
 - `mappa_catastale_2000.png` — estratto catastale 945×709 px (≈ scala 1:2000, ~160×120 m) su **sfondo bianco**, con particelle dal bordo nero sottile e senza riempimento, e fabbricati con riempimento grigio `#999999` e bordo nero di spessore doppio.
+
+In entrambe le immagini il punto fiduciale è disegnato al centro con un simbolo a mirino.
 
 ### Import dei rilievi
 Carica uno o più file **KML** o **GeoJSON**: vengono aggiunti come livelli indipendenti, attivabili/disattivabili singolarmente. I KML con più cartelle (`<Folder>`) vengono splittati automaticamente in un livello per cartella. Ogni punto del rilievo ha un popup con il link a Google Maps per la navigazione.

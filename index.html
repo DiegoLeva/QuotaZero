@@ -364,10 +364,6 @@
     .pf-photo-previews img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
     .pf-modal-actions { display: flex; gap: 8px; }
 
-    .rilievo-marker-wrap { background: none; border: none; }
-    .rilievo-marker { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--c, #ff2d6f); border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.55); }
-    .rilievo-marker .icon { font-size: 16px; color: #1a0009; }
-
     .comune-search {
       position: fixed; z-index: 760; left: 50%; top: 70px;
       width: min(420px, calc(100vw - 28px));
@@ -834,7 +830,7 @@
       </div>
       <label class="pf-field">
         <span>Nome del punto</span>
-        <input id="pfName" type="text" placeholder="Lascia vuoto per nome automatico" autocomplete="off">
+        <input id="pfName" type="text" placeholder="Nome del punto" autocomplete="off">
       </label>
       <div class="pf-photos">
         <label class="btn full pf-photo-btn">
@@ -848,7 +844,8 @@
       </div>
       <div class="pf-photo-previews" id="pfPhotoPreviews"></div>
       <div class="pf-modal-actions">
-        <button class="btn warn full" id="pfSave" type="button"><span class="icon">save</span> Salva punto</button>
+        <button class="btn" id="pfMove" type="button" style="display:none"><span class="icon">open_with</span> Sposta</button>
+        <button class="btn warn" id="pfSave" type="button" style="flex:1"><span class="icon">save</span> Salva punto</button>
       </div>
     </div>
   </div>
@@ -966,6 +963,7 @@
       pfPhotoDettaglioLabel: document.getElementById("pfPhotoDettaglioLabel"),
       pfPhotoPreviews: document.getElementById("pfPhotoPreviews"),
       pfSave: document.getElementById("pfSave"),
+      pfMove: document.getElementById("pfMove"),
       openLayerSettings: document.getElementById("openLayerSettings"),
       layerSettingsModal: document.getElementById("layerSettingsModal"),
       layerSettingsClose: document.getElementById("layerSettingsClose"),
@@ -1263,13 +1261,13 @@
       const eff = effOpacity("rilievo");
       for (const p of state.rilievo.points.values()) {
         if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
-        const marker = L.marker([p.lat, p.lng], {
+        const marker = L.circleMarker([p.lat, p.lng], {
           pane: "rilievoPane",
-          icon: L.divIcon({
-            className: "rilievo-marker-wrap",
-            html: `<div class="rilievo-marker" style="--c:${color};opacity:${eff}"><span class="icon">push_pin</span></div>`,
-            iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14]
-          })
+          radius: 5,
+          color: "#ffffff",
+          weight: 1.5,
+          fillColor: color,
+          fillOpacity: eff
         });
         marker.bindPopup(() => buildRilievoPopup(p));
         marker.addTo(rilievoLayer);
@@ -1341,10 +1339,8 @@
       el.pfPlaceCoords.textContent = `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
     }
 
-    function startPfPlacement() {
-      if (state.rilievo.placing) return;
+    function showPlacementUI() {
       state.rilievo.placing = true;
-      state.rilievo.editId = null;
       el.addPfBtn.classList.add("active");
       el.pfCrosshair.classList.add("show");
       el.pfPlaceBar.classList.add("show");
@@ -1352,24 +1348,70 @@
       toast("Sposta la mappa sotto il mirino, poi premi OK.");
     }
 
-    function cancelPfPlacement() {
+    function hidePlacementUI() {
       state.rilievo.placing = false;
       el.addPfBtn.classList.remove("active");
       el.pfCrosshair.classList.remove("show");
       el.pfPlaceBar.classList.remove("show");
     }
 
+    function startPfPlacement() {
+      if (state.rilievo.placing) return;
+      state.rilievo.editId = null;
+      state.rilievo.moving = false;
+      state.rilievo.moveCtx = null;
+      showPlacementUI();
+    }
+
+    // Avvia lo spostamento di un punto esistente: torna alla fase di piazzamento
+    // mantenendo nome/foto correnti, e ricalcola tutto all'OK.
+    function startPfMove() {
+      if (state.rilievo.editId == null) return;
+      const original = state.rilievo.points.get(state.rilievo.editId);
+      if (!original) return;
+      state.rilievo.moving = true;
+      state.rilievo.moveCtx = {
+        id: state.rilievo.editId,
+        photos: { ...state.rilievo.photos },
+        nameText: el.pfName.value,
+        nameIsAuto: state.rilievo.nameIsAuto
+      };
+      el.pfModal.classList.remove("show");
+      map.setView([original.lat, original.lng], map.getZoom());
+      showPlacementUI();
+    }
+
     function confirmPfPlacement() {
       const c = map.getCenter();
-      cancelPfPlacement();
-      openPfModal({ latlng: { lat: c.lat, lng: c.lng } });
+      const moving = state.rilievo.moving;
+      const ctx = state.rilievo.moveCtx;
+      state.rilievo.moving = false;
+      state.rilievo.moveCtx = null;
+      hidePlacementUI();
+      if (moving && ctx) {
+        const original = state.rilievo.points.get(ctx.id);
+        openPfModal({ editPoint: { ...original, lat: c.lat, lng: c.lng, photos: ctx.photos }, moved: true, nameText: ctx.nameText, nameIsAuto: ctx.nameIsAuto });
+      } else {
+        openPfModal({ latlng: { lat: c.lat, lng: c.lng } });
+      }
+    }
+
+    function cancelPfPlacement() {
+      const moving = state.rilievo.moving;
+      const ctx = state.rilievo.moveCtx;
+      state.rilievo.moving = false;
+      state.rilievo.moveCtx = null;
+      hidePlacementUI();
+      if (moving && ctx) {
+        const original = state.rilievo.points.get(ctx.id);
+        if (original) openPfModal({ editPoint: { ...original, photos: ctx.photos }, moved: true, nameText: ctx.nameText, nameIsAuto: ctx.nameIsAuto });
+      }
     }
 
     // ---- Reverse lookup catastale (best-effort) ----
 
     async function reverseParcel(latlng) {
-      if (map.getZoom() < 16) return null;
-      const meters = Math.max(1.5, 22 - map.getZoom());
+      const meters = 4;
       const latD = meters / 111320;
       const lngD = meters / (111320 * Math.max(.25, Math.cos(latlng.lat * Math.PI / 180)));
       const bbox = [latlng.lng - lngD, latlng.lat - latD, latlng.lng + lngD, latlng.lat + latD].join(",");
@@ -1410,28 +1452,43 @@
       }
     }
 
-    async function openPfModal({ latlng, editPoint }) {
+    function pfAutoName() {
+      const d = state.rilievo.draft;
+      if (!d) return "";
+      if (d.foglio || d.particella) return `PF ${d.foglio || "?"}-${d.particella || "?"}`;
+      return "";
+    }
+
+    function applyPfAutoName() {
+      if (!state.rilievo.nameIsAuto) return;
+      el.pfName.value = pfAutoName();
+    }
+
+    async function openPfModal({ latlng, editPoint, moved, nameText, nameIsAuto }) {
       state.rilievo.photos = { spigolo: null, dettaglio: null };
       let lat, lng, comune = "", nome = "";
       if (editPoint) {
         state.rilievo.editId = editPoint.id;
         lat = editPoint.lat; lng = editPoint.lng;
         comune = editPoint.comune || "";
-        nome = editPoint.nome || "";
+        nome = moved ? (nameText || "") : (editPoint.nome || "");
         el.pfModalTitle.textContent = `Modifica PF #${editPoint.seq}`;
         if (editPoint.photos) state.rilievo.photos = { ...editPoint.photos };
+        state.rilievo.nameIsAuto = moved ? !!nameIsAuto : !(nome && nome.trim());
       } else {
         state.rilievo.editId = null;
         lat = latlng.lat; lng = latlng.lng;
         el.pfModalTitle.textContent = "Nuovo Punto Fiduciale";
+        state.rilievo.nameIsAuto = true;
       }
       resetPfPhotoUI();
-      state.rilievo.draft = { lat, lng, comune, foglio: "", particella: "" };
+      state.rilievo.draft = { lat, lng, comune, foglio: "", particella: "", moved: !!moved };
       el.pfName.value = nome;
       el.pfMetaCoords.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       el.pfMetaComune.textContent = comune || "…";
       el.pfMetaFoglio.textContent = "…";
       el.pfMetaParticella.textContent = "…";
+      el.pfMove.style.display = (state.rilievo.editId != null) ? "" : "none";
       el.pfModal.classList.add("show");
 
       try {
@@ -1439,8 +1496,8 @@
         if (info) {
           state.rilievo.draft.foglio = info.foglio !== "-" ? info.foglio : "";
           state.rilievo.draft.particella = info.particella !== "-" ? info.particella : "";
-          if (!comune && info.comune && info.comune !== "-") state.rilievo.draft.comune = info.comune;
-          el.pfMetaComune.textContent = state.rilievo.draft.comune || "-";
+          if (info.comune && info.comune !== "-" && (!comune || moved)) state.rilievo.draft.comune = info.comune;
+          el.pfMetaComune.textContent = state.rilievo.draft.comune || comune || "-";
           el.pfMetaFoglio.textContent = info.foglio !== "-" ? info.foglio + (info.allegato || "") : "-";
           el.pfMetaParticella.textContent = info.particella || "-";
         } else {
@@ -1453,6 +1510,7 @@
         el.pfMetaFoglio.textContent = "-";
         el.pfMetaParticella.textContent = "-";
       }
+      applyPfAutoName();
     }
 
     function closePfModal() {
@@ -1470,9 +1528,11 @@
       try {
         let saved;
         if (state.rilievo.editId != null) {
+          const body = { id: state.rilievo.editId, nome };
+          if (d.moved) { body.lat = d.lat; body.lng = d.lng; }
           const res = await fetch("/api/punti-rilievo", {
             method: "PUT", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: state.rilievo.editId, nome })
+            body: JSON.stringify(body)
           });
           saved = await res.json();
           if (!res.ok) throw new Error(saved.error || "Errore salvataggio.");
@@ -1534,6 +1594,34 @@
       });
     }
 
+    // Simbolo del punto fiduciale (mirino + cerchio) al centro delle immagini generate.
+    function drawCenterMarker(ctx, cx, cy, r) {
+      const cross = r * 1.7;
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = r * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(cx - cross, cy); ctx.lineTo(cx + cross, cy);
+      ctx.moveTo(cx, cy - cross); ctx.lineTo(cx, cy + cross);
+      ctx.stroke();
+      ctx.strokeStyle = "#ff2d6f";
+      ctx.lineWidth = r * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(cx - cross, cy); ctx.lineTo(cx + cross, cy);
+      ctx.moveTo(cx, cy - cross); ctx.lineTo(cx, cy + cross);
+      ctx.stroke();
+      ctx.lineWidth = r * 0.34;
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = r * 0.2;
+      ctx.strokeStyle = "#ff2d6f";
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#ff2d6f";
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
     function extFromFile(f) {
       const t = (f.type || "").toLowerCase();
       if (t.includes("png")) return ".png";
@@ -1587,7 +1675,9 @@
       await Promise.all(jobs);
       const out = document.createElement("canvas");
       out.width = ORTHO_PX; out.height = ORTHO_PX;
-      out.getContext("2d").drawImage(src, minX - originX, minY - originY, maxX - minX, maxY - minY, 0, 0, ORTHO_PX, ORTHO_PX);
+      const octx = out.getContext("2d");
+      octx.drawImage(src, minX - originX, minY - originY, maxX - minX, maxY - minY, 0, 0, ORTHO_PX, ORTHO_PX);
+      drawCenterMarker(octx, ORTHO_PX / 2, ORTHO_PX / 2, 30);
       return await canvasToBlob(out, "image/jpeg", 0.9);
     }
 
@@ -1623,6 +1713,7 @@
         const bimg = await loadImageEl(cadGetMapUrl("fabbricati", buildSld, lat, lng));
         ctx.drawImage(bimg, 0, 0, CAD_W, CAD_H);
       } catch (e) { console.warn("Mappa fabbricati non disponibile", e); }
+      drawCenterMarker(ctx, CAD_W / 2, CAD_H / 2, 16);
       return await canvasToBlob(out, "image/png");
     }
 
@@ -2374,6 +2465,8 @@
     el.pfModalClose.addEventListener("click", closePfModal);
     el.pfModal.addEventListener("click", e => { if (e.target === el.pfModal) closePfModal(); });
     el.pfSave.addEventListener("click", savePfPoint);
+    el.pfMove.addEventListener("click", startPfMove);
+    el.pfName.addEventListener("input", () => { state.rilievo.nameIsAuto = false; });
     el.pfPhotoSpigolo.addEventListener("change", e => { state.rilievo.photos.spigolo = e.target.files[0] || null; refreshPfPhotoUI(); });
     el.pfPhotoDettaglio.addEventListener("change", e => { state.rilievo.photos.dettaglio = e.target.files[0] || null; refreshPfPhotoUI(); });
     document.addEventListener("click", e => {
