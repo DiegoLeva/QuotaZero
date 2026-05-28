@@ -1324,10 +1324,11 @@
     const GANDALF_MIN_ZOOM = 10;
     let gandalfBubbleTimer = null;
     let gandalfBubble = null;
+    let gandalfActive = false;
 
     function updateGandalf() {
       const visible = map.getZoom() >= GANDALF_MIN_ZOOM;
-      if (visible || gandalfBubbleTimer) {
+      if (visible || gandalfActive || gandalfBubbleTimer) {
         if (!map.hasLayer(gandalfOverlay)) gandalfOverlay.addTo(map);
         // keep bubble scaled when visible
         try { updateGandalfBubbleScale(); } catch (e) { /* noop */ }
@@ -1336,9 +1337,11 @@
       }
     }
     map.on("zoomend", updateGandalf);
+    map.on("moveend", () => { if (gandalfBubble) updateGandalfBubbleScale(); });
 
     function hideGandalfBubble() {
       gandalfBubbleTimer = null;
+      gandalfActive = false;
       if (gandalfBubble) { map.removeLayer(gandalfBubble); gandalfBubble = null; }
       updateGandalf();
     }
@@ -1358,6 +1361,7 @@
         .addTo(map);
       // scale the whole tooltip (bubble) to match the GIF width
       try {
+        gandalfActive = true;
         const el = gandalfBubble.getElement && gandalfBubble.getElement();
         if (el) {
           el.style.transformOrigin = '50% 100%';
@@ -1381,6 +1385,7 @@
         const gifWidth = Math.max(8, Math.abs(ne.x - nw.x));
         const scale = (gifWidth * 0.9) / elWidth;
         el.style.transform = `scale(${scale})`;
+        try { gandalfBubble && gandalfBubble.update && gandalfBubble.update(); } catch (e) { }
       } catch (e) { /* noop */ }
       return;
     }
