@@ -150,6 +150,9 @@
     .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .file-input { display: none; }
 
+    .gandalf-marker { background: transparent; border: 0; }
+    .gandalf-marker img { display: block; image-rendering: pixelated; pointer-events: none; }
+
     .metric { position: fixed; z-index: 720; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(120px); min-width: min(310px, calc(100vw - 112px)); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); box-shadow: var(--shadow); backdrop-filter: blur(18px); transition: transform .2s ease; }
     .metric.show { transform: translateX(-50%) translateY(0); }
     .metric-value { font-weight: 800; }
@@ -1259,6 +1262,28 @@
     });
 
     setIdentifyMode(true);
+
+    const gandalfMarker = L.marker([41.50044582554866, 13.557234185276197], {
+      icon: L.divIcon({
+        className: "gandalf-marker",
+        html: '<img src="gandalf.gif" width="40" height="40" alt="">',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+      }),
+      interactive: false,
+      keyboard: false,
+      pane: "markerPane"
+    });
+    const GANDALF_MIN_ZOOM = 18;
+    function updateGandalf() {
+      if (map.getZoom() >= GANDALF_MIN_ZOOM) {
+        if (!map.hasLayer(gandalfMarker)) gandalfMarker.addTo(map);
+      } else if (map.hasLayer(gandalfMarker)) {
+        map.removeLayer(gandalfMarker);
+      }
+    }
+    map.on("zoomend", updateGandalf);
+    updateGandalf();
   </script>
 </body>
 </html>
