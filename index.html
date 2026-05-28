@@ -333,7 +333,11 @@
         <div class="section-title">Ricerca Particella</div>
         <div class="row" style="display: flex; flex-direction: column; gap: 10px;">
           
-          <input id="searchComune" type="text" list="comuneSearchList" placeholder="Comune..." autocomplete="off" spellcheck="false" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
+          <div style="position:relative; width:100%;">
+            <input id="searchComune" type="text" list="comuneSearchList" placeholder="Comune..." autocomplete="off" spellcheck="false" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%; padding-right:40px;">
+            <button id="searchComuneToggle" title="Apri elenco" style="position:absolute; right:6px; top:6px; width:32px; height:32px; border-radius:6px; border:none; background:transparent; color:var(--ink);">▾</button>
+            <div id="comuneDropdown" class="comune-dropdown" style="display:none; position:absolute; right:0; left:0; top:42px; max-height:240px; overflow:auto; background:var(--panel-solid); border:1px solid var(--line); border-radius:8px; z-index:2000;"></div>
+          </div>
           <datalist id="comuneSearchList">
             <option value="Acquafondata (A032)"></option>
             <option value="Acuto (A054)"></option>
@@ -1190,6 +1194,45 @@
     const comuneByLabel = new Map(comuneOptions.map(c => [c.label.toLowerCase(), c]));
     const comuneByName = new Map(comuneOptions.map(c => [c.name.toLowerCase(), c]));
     const comuneByCode = new Map(comuneOptions.map(c => [c.code.toLowerCase(), c]));
+
+    // Dropdown button: populate custom dropdown while keeping datalist/autocomplete
+    (function initComuneDropdown(){
+      const toggle = document.getElementById('searchComuneToggle');
+      const dropdown = document.getElementById('comuneDropdown');
+      const input = document.getElementById('searchComune');
+      if (!toggle || !dropdown || !input) return;
+
+      function buildList() {
+        dropdown.innerHTML = '';
+        comuneOptions.forEach(c => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'btn';
+          item.style = 'display:block; width:100%; text-align:left; padding:8px 10px; border:none; background:transparent; gap:8px;';
+          item.textContent = c.label;
+          item.dataset.code = c.code;
+          item.addEventListener('click', () => {
+            input.value = c.label;
+            dropdown.style.display = 'none';
+            input.focus();
+          });
+          dropdown.appendChild(item);
+        });
+      }
+
+      function toggleDropdown() {
+        if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+          buildList();
+          dropdown.style.display = 'block';
+        } else {
+          dropdown.style.display = 'none';
+        }
+      }
+
+      toggle.addEventListener('click', (e) => { e.stopPropagation(); toggleDropdown(); });
+      document.addEventListener('click', () => { dropdown.style.display = 'none'; });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Escape') dropdown.style.display = 'none'; });
+    })();
 
     function resolveComune(raw) {
       const v = (raw || "").trim().toLowerCase();
