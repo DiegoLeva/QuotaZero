@@ -151,7 +151,27 @@
     .file-input { display: none; }
 
     .gandalf-marker { background: transparent; border: 0; }
-    .gandalf-marker img { display: block; image-rendering: pixelated; pointer-events: none; }
+    .gandalf-marker img { display: block; pointer-events: none; }
+
+    .leaflet-tooltip.gandalf-bubble {
+      padding: 8px 14px;
+      color: #1a0510;
+      background: #fff;
+      border: 2px solid var(--danger);
+      border-radius: 16px;
+      font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", system-ui, sans-serif;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: .02em;
+      white-space: nowrap;
+      box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 6px 22px rgba(255,45,111,.55);
+      animation: gandalf-pop .22s ease-out;
+    }
+    .leaflet-tooltip.gandalf-bubble::before { border-top-color: var(--danger) !important; }
+    @keyframes gandalf-pop {
+      from { transform: translateY(6px) scale(.6); opacity: 0; }
+      to   { transform: translateY(0) scale(1); opacity: 1; }
+    }
 
     .metric { position: fixed; z-index: 720; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(120px); min-width: min(310px, calc(100vw - 112px)); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); box-shadow: var(--shadow); backdrop-filter: blur(18px); transition: transform .2s ease; }
     .metric.show { transform: translateX(-50%) translateY(0); }
@@ -1005,7 +1025,9 @@
             const fglRaw = f?.[1] || ref?.[2] || "-";
             const { foglio: fgl, allegato: all } = normalizeFoglio(fglRaw);
             const fglDisplay = fgl === "-" ? "-" : (fgl + all);
-            showIdentifyBanner({ comune: ref?.[1] || "-", foglio: fglDisplay, particella: p?.[1] || ref?.[3] || "-" });
+            const partVal = p?.[1] || ref?.[3] || "-";
+            showIdentifyBanner({ comune: ref?.[1] || "-", foglio: fglDisplay, particella: partVal });
+            maybeTriggerGandalf(ref?.[1], fgl, all, partVal);
             toast("Dati particella recuperati.");
         } else {
             toast("Nessuna particella trovata in questo punto."); 
@@ -1263,26 +1285,62 @@
 
     setIdentifyMode(true);
 
+    const GANDALF_SIZE = 64;
     const gandalfMarker = L.marker([41.50044582554866, 13.557234185276197], {
       icon: L.divIcon({
         className: "gandalf-marker",
-        html: '<img src="gandalf.gif" width="40" height="40" alt="">',
-        iconSize: [40, 40],
-        iconAnchor: [20, 20]
+        html: `<img src="gandalf.gif" width="${GANDALF_SIZE}" height="${GANDALF_SIZE}" alt="">`,
+        iconSize: [GANDALF_SIZE, GANDALF_SIZE],
+        iconAnchor: [GANDALF_SIZE / 2, GANDALF_SIZE / 2]
       }),
       interactive: false,
       keyboard: false,
       pane: "markerPane"
     });
-    const GANDALF_MIN_ZOOM = 18;
+    const GANDALF_MIN_ZOOM = 19;
     function updateGandalf() {
       if (map.getZoom() >= GANDALF_MIN_ZOOM) {
         if (!map.hasLayer(gandalfMarker)) gandalfMarker.addTo(map);
-      } else if (map.hasLayer(gandalfMarker)) {
+      } else if (map.hasLayer(gandalfMarker) && !gandalfBubbleTimer) {
         map.removeLayer(gandalfMarker);
       }
     }
     map.on("zoomend", updateGandalf);
+
+    let gandalfBubbleTimer = null;
+    function showGandalfBubble() {
+      if (!map.hasLayer(gandalfMarker)) gandalfMarker.addTo(map);
+      gandalfMarker.unbindTooltip();
+      gandalfMarker.bindTooltip("Tu non puoi passare!", {
+        permanent: true,
+        direction: "top",
+        offset: [0, -(GANDALF_SIZE / 2 + 6)],
+        className: "gandalf-bubble",
+        interactive: false
+      }).openTooltip();
+      clearTimeout(gandalfBubbleTimer);
+      gandalfBubbleTimer = setTimeout(() => {
+        gandalfBubbleTimer = null;
+        gandalfMarker.unbindTooltip();
+        updateGandalf();
+      }, 4500);
+    }
+
+    const GANDALF_PARCELS = {
+      comune: "H917",
+      foglio: "5",
+      allegato: "A",
+      particelle: new Set(["1101", "194", "195", "1211"])
+    };
+    function maybeTriggerGandalf(comune, foglio, allegato, particella) {
+      if (!comune || !particella) return;
+      if (comune.toUpperCase() !== GANDALF_PARCELS.comune) return;
+      if (String(foglio) !== GANDALF_PARCELS.foglio) return;
+      if ((allegato || "").toUpperCase() !== GANDALF_PARCELS.allegato) return;
+      if (!GANDALF_PARCELS.particelle.has(String(particella))) return;
+      showGandalfBubble();
+    }
+
     updateGandalf();
   </script>
 </body>
