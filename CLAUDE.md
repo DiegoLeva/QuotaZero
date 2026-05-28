@@ -37,14 +37,15 @@ No bundler, no framework, no transpiler. Frontend libraries are loaded from CDN 
 | Ortofoto AGEA 2012 | `https://wms.pcn.minambiente.it/ogc?map=...ortofoto_colore_12.map` |
 | Google Satellite tiles | `https://{mt0-3}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}` |
 | Bing Satellite tiles | `https://ecn.t{0-3}.tiles.virtualearth.net/tiles/a{quadkey}.jpeg` (quadkey computed client-side) |
-| Parcel lookup DB | Neon Postgres + PostGIS, table `particelle_catastali (comune, foglio, particella, geometry)` |
+| Parcel lookup DB | Neon Postgres + PostGIS, table `particelle_catastali (comune, foglio, allegato, particella, geometry)` |
 
 ## Backend contract — `/api/cerca-particella`
 
-`GET /api/cerca-particella?comune=<codice>&foglio=<n>&particella=<n>`
+`GET /api/cerca-particella?comune=<codice>&foglio=<n>&particella=<n>&allegato=<lettera>`
 
 - `comune` is the ISTAT/Belfiore code (e.g. `D810` = Frosinone). The list of supported codes is hard-coded in the `<select id="searchComune">` inside `index.html` — currently the ~80 comuni of the Frosinone province.
 - Foglio/particella are matched with leading zeros stripped, against both forms.
+- `allegato` is optional: empty (or missing) matches rows where the DB column is `NULL` (most parcels); a letter like `A` / `B` matches that specific allegato. The match uses `IS NOT DISTINCT FROM` so `NULL = NULL` is treated as equal. The frontend splits user input like `5A` into `foglio=5` + `allegato=A` before calling the endpoint.
 - Returns `{ centro: [lat, lng] }` on hit, `404` on miss. (The geometry column on the DB is still queried implicitly through `ST_Centroid`, but the polygon itself is not serialized — the frontend currently only centers the map and shows a popup.)
 - Requires env var `DATABASE_URL` (Neon connection string with `?sslmode=require`).
 

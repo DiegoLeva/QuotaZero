@@ -95,6 +95,8 @@ Console Neon del progetto: <https://console.neon.tech/app/projects/holy-darkness
 ```sql
 CREATE EXTENSION IF NOT EXISTS postgis;
 
+DROP TABLE IF EXISTS particelle_catastali;
+
 CREATE TABLE particelle_catastali (
   comune      text,         -- codice Belfiore, es. 'D810'
   foglio      text,
@@ -107,27 +109,40 @@ CREATE INDEX ON particelle_catastali USING GIST (geometry);
 CREATE INDEX ON particelle_catastali (comune, foglio, particella, allegato);
 ```
 
+Lo script è idempotente: rilanciarlo blocco intero ricrea la tabella da zero (`DROP` + `CREATE`), cancellando eventuali dati pregressi. Va eseguito **prima** del popolamento (sotto).
+
 ### Popolamento del DB dai file GML del Catasto
 
 I dati partono dai file GML INSPIRE dell'Agenzia delle Entrate (`*_ple.gml`, uno per Comune). Per caricarli su Neon si usa `ogr2ogr` (incluso in QGIS) direttamente da PowerShell.
 
+> **Prerequisito**: esegui prima il blocco SQL della sezione *Schema* sopra. Il `DROP TABLE IF EXISTS` rimuove eventuali dati pregressi e ricrea la tabella vuota con le colonne e gli indici corretti — lo script PowerShell qui sotto si limita ad appendere.
+
 > **Nota**: le geometrie vengono **semplificate con tolleranza 1** (≈ 1 grado, di fatto un triangolo per particella). È una scelta deliberata per **risparmiare spazio sul DB** — l'app non disegna più il poligono, le serve solo il centroide per centrare la mappa. Se in futuro serviranno i confini reali, rifare l'import senza l'opzione `-simplify`.
 
 ```powershell
-$ogr   = "C:\Program Files\QGIS 3.44.10\bin\ogr2ogr.exe"
-$pg    = "PG:host=ep-old-glade-al3cw8um.c-3.eu-central-1.aws.neon.tech dbname=neondb user=DB_USER password=DB_PASSWORD sslmode=require"
-$src   = "C:\path\alla\cartella\con\i\file_ple.gml"
-$sql   = "SELECT msGeometry, ADMINISTRATIVEUNIT AS comune, ltrim(substr(NATIONALCADASTRALREFERENCE, instr(NATIONALCADASTRALREFERENCE,'_')+1, 4),'0') AS foglio, NULLIF(rtrim(substr(NATIONALCADASTRALREFERENCE, instr(NATIONALCADASTRALREFERENCE,'_')+5, instr(NATIONALCADASTRALREFERENCE,'.') - instr(NATIONALCADASTRALREFERENCE,'_') - 5), '0123456789'),'') AS allegato, ltrim(LABEL,'0') AS particella FROM CadastralParcel"
+$ogr = "C:\Program Files\QGIS 3.44.10\bin\ogr2ogr.exe"
+$pg  = "PG:host=ep-old-glade-al3cw8um.c-3.eu-central-1.aws.neon.tech dbname=neondb user=DB_USER password=DB_PASSWORD sslmode=require"
+$src = "C:\path\alla\cartella\con\i\file_ple.gml"
 
-$mode = "-overwrite"
+$sql = @'
+SELECT
+  msGeometry,
+  ADMINISTRATIVEUNIT AS comune,
+  ltrim(substr(NATIONALCADASTRALREFERENCE, instr(NATIONALCADASTRALREFERENCE,'_')+1, 4),'0') AS foglio,
+  NULLIF(rtrim(substr(NATIONALCADASTRALREFERENCE,
+                      instr(NATIONALCADASTRALREFERENCE,'_')+5,
+                      instr(NATIONALCADASTRALREFERENCE,'.') - instr(NATIONALCADASTRALREFERENCE,'_') - 5),
+               '0123456789'),'') AS allegato,
+  ltrim(LABEL,'0') AS particella
+FROM CadastralParcel
+'@
+
 Get-ChildItem -Path $src -Filter "*_ple.gml" | ForEach-Object {
-    Write-Host "=== $($_.Name)  ($mode) ===" -ForegroundColor Cyan
+    Write-Host "=== $($_.Name) ===" -ForegroundColor Cyan
     & $ogr -f PostgreSQL $pg $_.FullName -dialect SQLITE -sql $sql `
         -nln particelle_catastali -nlt PROMOTE_TO_MULTI -t_srs EPSG:4326 `
         -simplify 1 `
-        -lco GEOMETRY_NAME=geometry -lco FID=id -lco SPATIAL_INDEX=GIST `
-        $mode -progress
-    $mode = "-append"
+        -append -progress
 }
 Write-Host "===== FATTO =====" -ForegroundColor Green
 ```
@@ -137,8 +152,7 @@ Cosa fa lo script, in breve:
 - itera tutti i `*_ple.gml` nella cartella `$src`;
 - usa il dialetto SQLite di OGR per estrarre da `CadastralParcel` il **codice Comune** (`ADMINISTRATIVEUNIT`), il **foglio**, l'eventuale **allegato** (lettera tra le 4 cifre del foglio e il `.`, es. `A` da `0005A0`) e la **particella** parsando il campo `NATIONALCADASTRALREFERENCE`, rimuovendo gli zeri iniziali con `ltrim`;
 - riproietta le geometrie a **EPSG:4326** e le promuove a MultiPolygon;
-- crea automaticamente la tabella `particelle_catastali` (con `-overwrite` al primo file) e poi appende i successivi (`-append`);
-- crea l'indice spaziale GIST sulla colonna `geometry`.
+- appende le righe nella tabella `particelle_catastali` (già creata dallo schema SQL).
 
 Da rilanciare quando si aggiunge un Comune nuovo o quando l'Agenzia delle Entrate pubblica un aggiornamento dei GML.
 
