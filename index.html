@@ -353,7 +353,7 @@
           </select>
           
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <input id="searchFoglio" type="number" placeholder="Foglio" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
+            <input id="searchFoglio" type="text" inputmode="text" autocapitalize="characters" placeholder="Foglio (es. 5 o 5A)" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
             <input id="searchParticella" type="text" placeholder="Particella" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
           </div>
           
@@ -796,6 +796,16 @@
       el.identifyBanner.classList.add("show");
     }
 
+    function normalizeFoglio(raw) {
+      if (!raw || raw === "-") return { foglio: raw, allegato: "" };
+      let s = String(raw).toUpperCase().trim()
+        .replace(/^(\d+)([A-Z]+)0$/, "$1$2")
+        .replace(/^0+(\d)/, "$1");
+      const m = s.match(/^(\d+)([A-Z]*)$/);
+      if (!m) return { foglio: s, allegato: "" };
+      return { foglio: m[1], allegato: m[2] || "" };
+    }
+
     async function fetchFeatureInfoText(url) {
       const proxyUrl = `/api/wms-proxy?url=${encodeURIComponent(url)}`;
       try {
@@ -831,9 +841,12 @@
         const ref = text.match(/NationalCadastralReference\s+([A-Z0-9]+)_([A-Z0-9]+)\.([A-Z0-9/]+)/i);
         
         if (f || p || ref) {
-            showIdentifyBanner({ comune: ref?.[1] || "-", foglio: f?.[1] || ref?.[2] || "-", particella: p?.[1] || ref?.[3] || "-" });
+            const fglRaw = f?.[1] || ref?.[2] || "-";
+            const { foglio: fgl, allegato: all } = normalizeFoglio(fglRaw);
+            const fglDisplay = fgl === "-" ? "-" : (fgl + all);
+            showIdentifyBanner({ comune: ref?.[1] || "-", foglio: fglDisplay, particella: p?.[1] || ref?.[3] || "-" });
             toast("Dati particella recuperati.");
-        } else { 
+        } else {
             toast("Nessuna particella trovata in questo punto."); 
         }
       } catch (error) {
@@ -963,19 +976,27 @@
 
     el.btnSearchParcel.addEventListener("click", async () => {
       const comune = el.searchComune.value;
-      const foglio = el.searchFoglio.value.trim();
+      const foglioRaw = el.searchFoglio.value.trim();
       const particella = el.searchParticella.value.trim();
 
-      if (!comune || !foglio || !particella) {
+      if (!comune || !foglioRaw || !particella) {
         toast("Seleziona il comune e inserisci foglio e particella.");
         return;
       }
+
+      if (!/^\d+[A-Za-z]*$/.test(foglioRaw)) {
+        toast("Foglio non valido. Esempio: 5 oppure 5A.");
+        return;
+      }
+
+      const { foglio, allegato } = normalizeFoglio(foglioRaw);
+      const foglioDisplay = foglio + allegato;
 
       el.loader.classList.add("active");
       toast("Interrogazione database geospaziale...");
 
       try {
-        const url = `/api/cerca-particella?comune=${encodeURIComponent(comune)}&foglio=${encodeURIComponent(foglio)}&particella=${encodeURIComponent(particella)}`;
+        const url = `/api/cerca-particella?comune=${encodeURIComponent(comune)}&foglio=${encodeURIComponent(foglio)}&particella=${encodeURIComponent(particella)}&allegato=${encodeURIComponent(allegato)}`;
 
         const res = await fetch(url);
         const data = await res.json();
@@ -990,13 +1011,13 @@
           .setLatLng(data.centro)
           .setContent(`
             <div class="popup-title" style="color: #ff2d6f; font-weight:800; margin-bottom:4px;">Particella Individuata</div>
-            <div class="row-sub">Comune: ${escapeHtml(comune)}<br>Foglio: ${escapeHtml(foglio)}<br>Particella: ${escapeHtml(particella)}</div>
+            <div class="row-sub">Comune: ${escapeHtml(comune)}<br>Foglio: ${escapeHtml(foglioDisplay)}<br>Particella: ${escapeHtml(particella)}</div>
             <div class="popup-actions"><a class="btn blue" href="https://maps.google.com/?q=${data.centro[0]},${data.centro[1]}" target="_blank"><span class="icon">navigation</span> Google Maps</a></div>
           `)
           .openOn(map);
 
         el.drawer.classList.remove("open");
-        toast(`Centrata Foglio ${foglio}, Particella ${particella}`);
+        toast(`Centrata Foglio ${foglioDisplay}, Particella ${particella}`);
 
       } catch (err) {
         toast(err.message, 4000);

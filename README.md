@@ -98,12 +98,13 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE TABLE particelle_catastali (
   comune      text,         -- codice Belfiore, es. 'D810'
   foglio      text,
+  allegato    text,         -- lettera dell'allegato/sezione (A, B, ...), NULL se assente
   particella  text,
   geometry    geometry(MultiPolygon, 4326)
 );
 
 CREATE INDEX ON particelle_catastali USING GIST (geometry);
-CREATE INDEX ON particelle_catastali (comune, foglio, particella);
+CREATE INDEX ON particelle_catastali (comune, foglio, particella, allegato);
 ```
 
 ### Popolamento del DB dai file GML del Catasto
@@ -116,7 +117,7 @@ I dati partono dai file GML INSPIRE dell'Agenzia delle Entrate (`*_ple.gml`, uno
 $ogr   = "C:\Program Files\QGIS 3.44.10\bin\ogr2ogr.exe"
 $pg    = "PG:host=ep-old-glade-al3cw8um.c-3.eu-central-1.aws.neon.tech dbname=neondb user=DB_USER password=DB_PASSWORD sslmode=require"
 $src   = "C:\path\alla\cartella\con\i\file_ple.gml"
-$sql   = "SELECT msGeometry, ADMINISTRATIVEUNIT AS comune, ltrim(substr(NATIONALCADASTRALREFERENCE, instr(NATIONALCADASTRALREFERENCE,'_')+1, 4),'0') AS foglio, ltrim(LABEL,'0') AS particella FROM CadastralParcel"
+$sql   = "SELECT msGeometry, ADMINISTRATIVEUNIT AS comune, ltrim(substr(NATIONALCADASTRALREFERENCE, instr(NATIONALCADASTRALREFERENCE,'_')+1, 4),'0') AS foglio, NULLIF(rtrim(substr(NATIONALCADASTRALREFERENCE, instr(NATIONALCADASTRALREFERENCE,'_')+5, instr(NATIONALCADASTRALREFERENCE,'.') - instr(NATIONALCADASTRALREFERENCE,'_') - 5), '0123456789'),'') AS allegato, ltrim(LABEL,'0') AS particella FROM CadastralParcel"
 
 $mode = "-overwrite"
 Get-ChildItem -Path $src -Filter "*_ple.gml" | ForEach-Object {
@@ -134,7 +135,7 @@ Write-Host "===== FATTO =====" -ForegroundColor Green
 Cosa fa lo script, in breve:
 
 - itera tutti i `*_ple.gml` nella cartella `$src`;
-- usa il dialetto SQLite di OGR per estrarre da `CadastralParcel` il **codice Comune** (`ADMINISTRATIVEUNIT`), il **foglio** e la **particella** parsando il campo `NATIONALCADASTRALREFERENCE`, rimuovendo gli zeri iniziali con `ltrim`;
+- usa il dialetto SQLite di OGR per estrarre da `CadastralParcel` il **codice Comune** (`ADMINISTRATIVEUNIT`), il **foglio**, l'eventuale **allegato** (lettera tra le 4 cifre del foglio e il `.`, es. `A` da `0005A0`) e la **particella** parsando il campo `NATIONALCADASTRALREFERENCE`, rimuovendo gli zeri iniziali con `ltrim`;
 - riproietta le geometrie a **EPSG:4326** e le promuove a MultiPolygon;
 - crea automaticamente la tabella `particelle_catastali` (con `-overwrite` al primo file) e poi appende i successivi (`-append`);
 - crea l'indice spaziale GIST sulla colonna `geometry`.

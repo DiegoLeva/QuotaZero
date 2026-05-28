@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-  const { comune, foglio, particella } = req.query;
+  const { comune, foglio, particella, allegato } = req.query;
 
   if (!comune || !foglio || !particella) {
     return res.status(400).json({ error: 'Parametri mancanti nell\'URL.' });
@@ -23,6 +23,7 @@ export default async function handler(req, res) {
     const fgl = foglio.trim().replace(/^0+/, '');
     const part = particella.trim().replace(/^0+/, '');
     const codComune = comune.toUpperCase().trim();
+    const all = (allegato || '').trim().toUpperCase() || null;
 
     const query = `
       SELECT
@@ -32,10 +33,11 @@ export default async function handler(req, res) {
       WHERE (UPPER(comune) = $1)
         AND (foglio = $2 OR foglio = $3)
         AND (particella = $4)
+        AND (allegato IS NOT DISTINCT FROM $5)
       LIMIT 1;
     `;
 
-    const result = await pool.query(query, [codComune, fgl, foglio.trim(), part]);
+    const result = await pool.query(query, [codComune, fgl, foglio.trim(), part, all]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Particella non trovata nel database geometrico.' });
