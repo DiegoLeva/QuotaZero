@@ -21,6 +21,7 @@ Deployed on **Vercel**.
 
 ```
 index.html                      # 100% of the frontend — vanilla JS + Leaflet, no build step
+sw.js                           # service worker — intercepts tile requests for the four tile providers and serves from Cache (so saved offline tiles actually load when the device is offline)
 api/cerca-particella.js         # serverless fn — PostGIS query, centroid of one parcel
 api/cerca-comune.js             # serverless fn — PostGIS query, centroid of a whole comune
 api/punti-fiduciali.js          # serverless fn — Punti Fiduciali by bbox (or comune)
@@ -113,5 +114,6 @@ Pass-through proxy that fetches the URL server-side and returns the body. Exists
 ## Things to double-check before changing
 
 - The cadastral WMS is rate-limited and slow. Don't add layers that hit it on every map move.
-- `caches.add(...)` in `saveOffline()` uses `mode: 'no-cors'` — required for cross-origin tile providers, but it means you can't read the cached responses, only serve them. Don't "fix" this.
+- Offline tile caching: `saveOffline()` populates the `TILE_CACHE` via `fetch(req, {mode:'no-cors'}) + cache.put(req, resp)`. **Do not switch to `cache.add()`** — it rejects opaque (status 0) responses, which is why the original implementation silently cached nothing. The `no-cors` mode is required because Google/Bing tile servers don't return CORS headers; the trade-off is that responses are opaque and only readable via the SW's `fetch` handler, not from JS.
+- `sw.js` is what makes the offline cache actually usable: Leaflet loads tiles via `<img>` tags, so without a SW intercepting the network request and serving from Cache, the cached entries would never be hit. If you add a new tile provider, also add its hostname pattern to `TILE_HOST_PATTERNS` in `sw.js`.
 - The long-press timer is `720 ms` — tuned for touchscreens. Changing it will affect mobile UX.

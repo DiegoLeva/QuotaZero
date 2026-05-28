@@ -614,6 +614,10 @@
     const STORAGE_KEY = "georilievo_pro_state_v3";
     const TILE_CACHE = "georilievo-pro-tiles-v2";
 
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(err => console.warn("SW register failed", err));
+    }
+
     const state = {
       imported: new Map(),
       nextLayerId: 1,
@@ -1097,38 +1101,54 @@
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeState()));
       toast("Calcolo mappe satellitari e catastali area KML in corso...", 4000);
-      
+
+      const MAX_TILES = 1200;
       let cached = 0;
+
+      async function cachePut(cache, url) {
+        try {
+          const req = new Request(url, { mode: "no-cors" });
+          const resp = await fetch(req);
+          await cache.put(req, resp);
+          cached++;
+          return true;
+        } catch (e) { return false; }
+      }
+
       if ("caches" in window) {
         try {
           const cache = await caches.open(TILE_CACHE);
-          const zooms = [17, 18]; 
-          
-          for (const z of zooms) {
+          const zooms = [17, 18];
+
+          outer: for (const z of zooms) {
              const minG = map.project(allBounds.getNorthWest(), z).divideBy(256).floor();
              const maxG = map.project(allBounds.getSouthEast(), z).divideBy(256).floor();
              for(let x = minG.x; x <= maxG.x; x++) {
                  for(let y = minG.y; y <= maxG.y; y++) {
-                     if(cached > 1200) break;
+                     if(cached >= MAX_TILES) break outer;
                      const sub = ["mt0", "mt1", "mt2", "mt3"][Math.abs(x + y) % 4];
                      const gUrl = `https://${sub}.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
-                     try { await cache.add(new Request(gUrl, {mode:'no-cors'})); cached++; } catch(e){}
+                     await cachePut(cache, gUrl);
                  }
              }
-             
-             const minC = map.project(allBounds.getNorthWest(), z).divideBy(512).floor();
-             const maxC = map.project(allBounds.getSouthEast(), z).divideBy(512).floor();
+
+             const minC = map.project(allBounds.getNorthWest(), z).divideBy(CATASTO_TILE_SIZE).floor();
+             const maxC = map.project(allBounds.getSouthEast(), z).divideBy(CATASTO_TILE_SIZE).floor();
              for(let x = minC.x; x <= maxC.x; x++) {
                  for(let y = minC.y; y <= maxC.y; y++) {
-                     if(cached > 1200) break;
-                     const cUrl = parcelsLayer.getTileUrl({x: x, y: y, z: z});
-                     try { await cache.add(new Request(cUrl, {mode:'no-cors'})); cached++; } catch(e){}
+                     if(cached >= MAX_TILES) break outer;
+                     for (const layer of cadastreLayers) {
+                         if (z < (layer.options.minZoom || 0)) continue;
+                         const cUrl = layer.getTileUrl({x: x, y: y, z: z});
+                         await cachePut(cache, cUrl);
+                         if(cached >= MAX_TILES) break outer;
+                     }
                  }
              }
           }
         } catch(e) { console.warn(e); }
       }
-      
+
       el.offlineInfo.textContent = `Aree KML salvate: ${new Date().toLocaleString("it-IT")}. Tile in cache: ${cached}.`;
       toast(cached ? `Area rilievo salvata! ${cached} tasselli mappa memorizzati offline.` : "Errore salvataggio file mappa offline.");
     }

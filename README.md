@@ -42,7 +42,7 @@ Carica uno o più file **KML** o **GeoJSON**: vengono aggiunti come livelli indi
 ### Strumenti sul campo
 - **Misura distanza**: tocchi successivi sulla mappa creano una polilinea con il totale in metri/km.
 - **La mia posizione (GPS)**: centra la mappa sulla posizione corrente con cerchio di accuratezza.
-- **Modalità offline**: salva lo stato (KML importati, vista corrente) in `localStorage` e pre-scarica i tasselli di mappa satellitare e catastale dell'area dei KML caricati (zoom 17–18) nella Cache API del browser. Sul campo, senza connessione, basta "Ricarica offline".
+- **Modalità offline**: salva lo stato (KML importati, vista corrente) in `localStorage` e pre-scarica i tasselli di mappa satellitare Google e catastale (particelle, fabbricati, etichette) dell'area dei KML caricati (zoom 17–18) nella Cache API del browser. Quando si è senza rete, il service worker (`sw.js`) intercetta le richieste tile dei provider noti e le serve direttamente dalla cache. Sul campo, senza connessione, basta "Ricarica offline" per ripristinare i KML e la vista.
 
 ---
 
@@ -50,6 +50,7 @@ Carica uno o più file **KML** o **GeoJSON**: vengono aggiunti come livelli indi
 
 ```
 index.html                      # Tutta l'app frontend (vanilla JS + Leaflet)
+sw.js                           # service worker: serve i tile dalla Cache quando si è offline
 api/cerca-particella.js         # serverless: centroide di una particella (PostGIS)
 api/cerca-comune.js             # serverless: centroide complessivo di un comune
 api/punti-fiduciali.js          # serverless: punti fiduciali per bbox/comune
