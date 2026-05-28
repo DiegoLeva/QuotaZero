@@ -529,6 +529,10 @@
           Importa rilievo KML / GeoJSON
           <input class="file-input" id="fileInput" type="file" accept=".kml,.geojson,.json" multiple>
         </label>
+        <button class="btn warn full" id="clearImported" style="margin-top:8px">
+          <span class="icon">layers_clear</span>
+          Svuota mappa
+        </button>
         <div id="importedLayers"></div>
       </section>
 
@@ -646,6 +650,7 @@
       catastoOpacity: document.getElementById("catastoOpacity"),
       opacityValue: document.getElementById("opacityValue"),
       fileInput: document.getElementById("fileInput"),
+      clearImported: document.getElementById("clearImported"),
       importedLayers: document.getElementById("importedLayers"),
       gpsBtn: document.getElementById("gpsBtn"),
       goComuneBtn: document.getElementById("goComuneBtn"),
@@ -964,6 +969,16 @@
       }
     }
 
+    function clearImportedLayers() {
+      if (!state.imported.size) { toast("Nessun rilievo da rimuovere."); return; }
+      if (!confirm("Rimuovere tutti i rilievi importati dalla mappa?")) return;
+      for (const item of state.imported.values()) map.removeLayer(item.layer);
+      state.imported.clear();
+      state.nextLayerId = 1;
+      renderImportedLayers();
+      toast("Mappa svuotata.");
+    }
+
     async function importFiles(files) {
       for (const file of files) {
         try {
@@ -1169,6 +1184,7 @@
     });
     el.goFrosinone.addEventListener("click", () => map.setView([41.639, 13.341], 18));
     el.fileInput.addEventListener("change", e => importFiles(e.target.files));
+    el.clearImported.addEventListener("click", clearImportedLayers);
     el.importedLayers.addEventListener("change", e => {
       const id = e.target.dataset.layerId; if (!id) return;
       const item = state.imported.get(id); if (item) { item.visible = e.target.checked; setLayer(item.layer, item.visible); }
