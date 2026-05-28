@@ -142,6 +142,7 @@
     input[type=range] { width: 100%; accent-color: var(--accent); }
 
     .btn { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--r); background: linear-gradient(135deg, rgba(0,245,255,.12), rgba(255,45,111,.08)), var(--field); color: var(--ink); font-size: 13px; font-weight: 700; text-decoration: none; }
+    label.btn { cursor: pointer; }
     .btn.primary { color: #001015; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; }
     .btn.blue { color: #041926; background: var(--accent); border-color: transparent; }
     .btn.warn { color: #241704; background: var(--warn); border-color: transparent; }
@@ -292,103 +293,103 @@
         <div class="section-title">Ricerca Particella</div>
         <div class="row" style="display: flex; flex-direction: column; gap: 10px;">
           
-          <select id="searchComune" class="btn" style="width: 100%; background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); text-align: left; appearance: auto;">
-            <option value="">Seleziona Comune...</option>
-            <option value="A032">Acquafondata (A032)</option>
-            <option value="A054">Acuto (A054)</option>
-            <option value="A123">Alatri (A123)</option>
-            <option value="A244">Alvito (A244)</option>
-            <option value="A256">Amaseno (A256)</option>
-            <option value="A269">Anagni (A269)</option>
-            <option value="A348">Aquino (A348)</option>
-            <option value="A363">Arce (A363)</option>
-            <option value="A421">Arnara (A421)</option>
-            <option value="A433">Arpino (A433)</option>
-            <option value="A486">Atina (A486)</option>
-            <option value="A502">Ausonia (A502)</option>
-            <option value="A763">Belmonte Castello (A763)</option>
-            <option value="A720">Boville Ernica (A720)</option>
-            <option value="B195">Broccostella (B195)</option>
-            <option value="B543">Campoli Appennino (B543)</option>
-            <option value="B862">Casalattico (B862)</option>
-            <option value="B919">Casalvieri (B919)</option>
-            <option value="C034">Cassino (C034)</option>
-            <option value="C177">Castelliri (C177)</option>
-            <option value="C223">Castelnuovo Parano (C223)</option>
-            <option value="C338">Castro Dei Volsci (C338)</option>
-            <option value="C340">Castrocielo (C340)</option>
-            <option value="C413">Ceccano (C413)</option>
-            <option value="C479">Ceprano (C479)</option>
-            <option value="C545">Cervaro (C545)</option>
-            <option value="C836">Colfelice (C836)</option>
-            <option value="C870">Colle San Magno (C870)</option>
-            <option value="C864">Collepardo (C864)</option>
-            <option value="C998">Coreno Ausonio (C998)</option>
-            <option value="D440">Esperia (D440)</option>
-            <option value="D483">Falvaterra (D483)</option>
-            <option value="D539">Ferentino (D539)</option>
-            <option value="D591">Filettino (D591)</option>
-            <option value="A310">Fiuggi (A310)</option>
-            <option value="D667">Fontana Liri (D667)</option>
-            <option value="D682">Fontechiari (D682)</option>
-            <option value="D810">Frosinone (D810)</option>
-            <option value="D819">Fumone (D819)</option>
-            <option value="D881">Gallinaro (D881)</option>
-            <option value="E057">Giuliano Di Roma (E057)</option>
-            <option value="E236">Guarcino (E236)</option>
-            <option value="E340">Isola Del Liri (E340)</option>
-            <option value="F620">Monte San Giovanni Campano (F620)</option>
-            <option value="F740">Morolo (F740)</option>
-            <option value="G276">Paliano (G276)</option>
-            <option value="G362">Pastena (G362)</option>
-            <option value="G374">Patrica (G374)</option>
-            <option value="G500">Pescosolido (G500)</option>
-            <option value="G591">Picinisco (G591)</option>
-            <option value="G592">Pico (G592)</option>
-            <option value="G598">Piedimonte San Germano (G598)</option>
-            <option value="G659">Piglio (G659)</option>
-            <option value="G662">Pignataro Interamna (G662)</option>
-            <option value="G749">Pofi (G749)</option>
-            <option value="G838">Pontecorvo (G838)</option>
-            <option value="G935">Posta Fibreno (G935)</option>
-            <option value="H324">Ripi (H324)</option>
-            <option value="H393">Roccadarce (H393)</option>
-            <option value="H443">Roccasecca (H443)</option>
-            <option value="H779">San Biagio Saracinisco (H779)</option>
-            <option value="H824">San Donato Val Di Comino (H824)</option>
-            <option value="H880">San Giorgio A Liri (H880)</option>
-            <option value="H917">San Giovanni Incarico (H917)</option>
-            <option value="I408">San Vittore Del Lazio (I408)</option>
-            <option value="I256">Sant'Ambrogio Sul Garigliano (I256)</option>
-            <option value="I265">Sant'Andrea Del Garigliano (I265)</option>
-            <option value="I302">Sant'Apollinare (I302)</option>
-            <option value="I321">Sant'Elia Fiumerapido (I321)</option>
-            <option value="I351">Santopadre (I351)</option>
-            <option value="I669">Serrone (I669)</option>
-            <option value="I697">Settefrati (I697)</option>
-            <option value="I716">Sgurgola (I716)</option>
-            <option value="I838">Sora (I838)</option>
-            <option value="I973">Strangolagalli (I973)</option>
-            <option value="L009">Supino (L009)</option>
-            <option value="L105">Terelle (L105)</option>
-            <option value="L243">Torre Cajetani (L243)</option>
-            <option value="L290">Torrice (L290)</option>
-            <option value="L398">Trevi Nel Lazio (L398)</option>
-            <option value="L437">Trivigliano (L437)</option>
-            <option value="L598">Vallecorsa (L598)</option>
-            <option value="L605">Vallemaio (L605)</option>
-            <option value="L614">Vallerotonda (L614)</option>
-            <option value="L780">Veroli (L780)</option>
-            <option value="L836">Vicalvi (L836)</option>
-            <option value="L843">Vico Nel Lazio (L843)</option>
-            <option value="A081">Villa Latina (A081)</option>
-            <option value="L905">Villa Santa Lucia (L905)</option>
-            <option value="I364">Villa Santo Stefano (I364)</option>
-            <option value="M083">Viticuso (M083)</option>
-          </select>
+          <input id="searchComune" type="text" list="comuneSearchList" placeholder="Comune..." autocomplete="off" spellcheck="false" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
+          <datalist id="comuneSearchList">
+            <option value="Acquafondata (A032)"></option>
+            <option value="Acuto (A054)"></option>
+            <option value="Alatri (A123)"></option>
+            <option value="Alvito (A244)"></option>
+            <option value="Amaseno (A256)"></option>
+            <option value="Anagni (A269)"></option>
+            <option value="Aquino (A348)"></option>
+            <option value="Arce (A363)"></option>
+            <option value="Arnara (A421)"></option>
+            <option value="Arpino (A433)"></option>
+            <option value="Atina (A486)"></option>
+            <option value="Ausonia (A502)"></option>
+            <option value="Belmonte Castello (A763)"></option>
+            <option value="Boville Ernica (A720)"></option>
+            <option value="Broccostella (B195)"></option>
+            <option value="Campoli Appennino (B543)"></option>
+            <option value="Casalattico (B862)"></option>
+            <option value="Casalvieri (B919)"></option>
+            <option value="Cassino (C034)"></option>
+            <option value="Castelliri (C177)"></option>
+            <option value="Castelnuovo Parano (C223)"></option>
+            <option value="Castro Dei Volsci (C338)"></option>
+            <option value="Castrocielo (C340)"></option>
+            <option value="Ceccano (C413)"></option>
+            <option value="Ceprano (C479)"></option>
+            <option value="Cervaro (C545)"></option>
+            <option value="Colfelice (C836)"></option>
+            <option value="Colle San Magno (C870)"></option>
+            <option value="Collepardo (C864)"></option>
+            <option value="Coreno Ausonio (C998)"></option>
+            <option value="Esperia (D440)"></option>
+            <option value="Falvaterra (D483)"></option>
+            <option value="Ferentino (D539)"></option>
+            <option value="Filettino (D591)"></option>
+            <option value="Fiuggi (A310)"></option>
+            <option value="Fontana Liri (D667)"></option>
+            <option value="Fontechiari (D682)"></option>
+            <option value="Frosinone (D810)"></option>
+            <option value="Fumone (D819)"></option>
+            <option value="Gallinaro (D881)"></option>
+            <option value="Giuliano Di Roma (E057)"></option>
+            <option value="Guarcino (E236)"></option>
+            <option value="Isola Del Liri (E340)"></option>
+            <option value="Monte San Giovanni Campano (F620)"></option>
+            <option value="Morolo (F740)"></option>
+            <option value="Paliano (G276)"></option>
+            <option value="Pastena (G362)"></option>
+            <option value="Patrica (G374)"></option>
+            <option value="Pescosolido (G500)"></option>
+            <option value="Picinisco (G591)"></option>
+            <option value="Pico (G592)"></option>
+            <option value="Piedimonte San Germano (G598)"></option>
+            <option value="Piglio (G659)"></option>
+            <option value="Pignataro Interamna (G662)"></option>
+            <option value="Pofi (G749)"></option>
+            <option value="Pontecorvo (G838)"></option>
+            <option value="Posta Fibreno (G935)"></option>
+            <option value="Ripi (H324)"></option>
+            <option value="Roccadarce (H393)"></option>
+            <option value="Roccasecca (H443)"></option>
+            <option value="San Biagio Saracinisco (H779)"></option>
+            <option value="San Donato Val Di Comino (H824)"></option>
+            <option value="San Giorgio A Liri (H880)"></option>
+            <option value="San Giovanni Incarico (H917)"></option>
+            <option value="San Vittore Del Lazio (I408)"></option>
+            <option value="Sant'Ambrogio Sul Garigliano (I256)"></option>
+            <option value="Sant'Andrea Del Garigliano (I265)"></option>
+            <option value="Sant'Apollinare (I302)"></option>
+            <option value="Sant'Elia Fiumerapido (I321)"></option>
+            <option value="Santopadre (I351)"></option>
+            <option value="Serrone (I669)"></option>
+            <option value="Settefrati (I697)"></option>
+            <option value="Sgurgola (I716)"></option>
+            <option value="Sora (I838)"></option>
+            <option value="Strangolagalli (I973)"></option>
+            <option value="Supino (L009)"></option>
+            <option value="Terelle (L105)"></option>
+            <option value="Torre Cajetani (L243)"></option>
+            <option value="Torrice (L290)"></option>
+            <option value="Trevi Nel Lazio (L398)"></option>
+            <option value="Trivigliano (L437)"></option>
+            <option value="Vallecorsa (L598)"></option>
+            <option value="Vallemaio (L605)"></option>
+            <option value="Vallerotonda (L614)"></option>
+            <option value="Veroli (L780)"></option>
+            <option value="Vicalvi (L836)"></option>
+            <option value="Vico Nel Lazio (L843)"></option>
+            <option value="Villa Latina (A081)"></option>
+            <option value="Villa Santa Lucia (L905)"></option>
+            <option value="Villa Santo Stefano (I364)"></option>
+            <option value="Viticuso (M083)"></option>
+          </datalist>
           
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <input id="searchFoglio" type="text" inputmode="text" autocapitalize="characters" placeholder="Foglio (es. 5 o 5A)" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
+            <input id="searchFoglio" type="text" inputmode="text" autocapitalize="characters" placeholder="Foglio" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
             <input id="searchParticella" type="text" placeholder="Particella" class="btn" style="background: var(--panel-solid); border: 1px solid var(--line); color: var(--ink); width: 100%;">
           </div>
           
@@ -534,7 +535,6 @@
     <div class="comune-search-body">
       <span class="icon" aria-hidden="true">location_city</span>
       <input id="comuneSearchInput" type="text" list="comuneSearchList" placeholder="Cerca comune..." autocomplete="off" spellcheck="false">
-      <datalist id="comuneSearchList"></datalist>
       <button type="button" class="comune-search-go" id="comuneSearchGo" title="Vai" aria-label="Vai"><span class="icon">arrow_forward</span></button>
       <button type="button" class="comune-search-close" id="comuneSearchClose" title="Chiudi" aria-label="Chiudi"><span class="icon">close</span></button>
     </div>
@@ -1134,12 +1134,34 @@
     });
     map.on("locationerror", () => { el.gpsBtn.classList.remove("active"); toast("GPS non disponibile."); });
 
+    const comuneOptions = Array.from(el.comuneSearchList.options)
+      .map(o => {
+        const label = o.value.trim();
+        const m = label.match(/\(([^)]+)\)\s*$/);
+        return {
+          code: m ? m[1] : "",
+          name: label.replace(/\s*\([^)]*\)\s*$/, "").trim(),
+          label
+        };
+      })
+      .filter(c => c.code);
+    const comuneByLabel = new Map(comuneOptions.map(c => [c.label.toLowerCase(), c]));
+    const comuneByName = new Map(comuneOptions.map(c => [c.name.toLowerCase(), c]));
+    const comuneByCode = new Map(comuneOptions.map(c => [c.code.toLowerCase(), c]));
+
+    function resolveComune(raw) {
+      const v = (raw || "").trim().toLowerCase();
+      if (!v) return null;
+      return comuneByLabel.get(v) || comuneByName.get(v) || comuneByCode.get(v) || null;
+    }
+
     el.btnSearchParcel.addEventListener("click", async () => {
-      const comune = el.searchComune.value;
+      const comuneRaw = el.searchComune.value;
       const foglioRaw = el.searchFoglio.value.trim();
       const particella = el.searchParticella.value.trim();
 
-      if (!comune || !foglioRaw || !particella) {
+      const match = resolveComune(comuneRaw);
+      if (!match || !foglioRaw || !particella) {
         toast("Seleziona il comune e inserisci foglio e particella.");
         return;
       }
@@ -1149,6 +1171,7 @@
         return;
       }
 
+      const comune = match.code;
       const { foglio, allegato } = normalizeFoglio(foglioRaw);
       const foglioDisplay = foglio + allegato;
 
@@ -1171,7 +1194,7 @@
           .setLatLng(data.centro)
           .setContent(`
             <div class="popup-title" style="color: #ff2d6f; font-weight:800; margin-bottom:4px;">Particella Individuata</div>
-            <div class="row-sub">Comune: ${escapeHtml(comune)}<br>Foglio: ${escapeHtml(foglioDisplay)}<br>Particella: ${escapeHtml(particella)}</div>
+            <div class="row-sub">Comune: ${escapeHtml(match.name)} (${escapeHtml(comune)})<br>Foglio: ${escapeHtml(foglioDisplay)}<br>Particella: ${escapeHtml(particella)}</div>
             <div class="popup-actions"><a class="btn blue" href="https://maps.google.com/?q=${data.centro[0]},${data.centro[1]}" target="_blank"><span class="icon">navigation</span> Google Maps</a></div>
           `)
           .openOn(map);
@@ -1186,28 +1209,6 @@
         el.loader.classList.remove("active");
       }
     });
-
-    const comuneOptions = Array.from(el.searchComune.options)
-      .filter(o => o.value)
-      .map(o => ({
-        code: o.value,
-        name: o.textContent.replace(/\s*\([^)]*\)\s*$/, "").trim(),
-        label: o.textContent.trim()
-      }));
-    const comuneByLabel = new Map(comuneOptions.map(c => [c.label.toLowerCase(), c]));
-    const comuneByName = new Map(comuneOptions.map(c => [c.name.toLowerCase(), c]));
-    const comuneByCode = new Map(comuneOptions.map(c => [c.code.toLowerCase(), c]));
-    comuneOptions.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c.label;
-      el.comuneSearchList.appendChild(opt);
-    });
-
-    function resolveComune(raw) {
-      const v = (raw || "").trim().toLowerCase();
-      if (!v) return null;
-      return comuneByLabel.get(v) || comuneByName.get(v) || comuneByCode.get(v) || null;
-    }
 
     function openComuneSearch() {
       el.comuneSearch.classList.add("show");
