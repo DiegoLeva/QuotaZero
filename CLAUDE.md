@@ -6,7 +6,7 @@ Context for Claude Code working in this repo. Keep it short and current.
 
 A single-page web app for **cadastral field surveys** (rilievi catastali) in the province of Frosinone (Lazio, Italy). Surveyors open it on a phone/tablet in the field to:
 
-- view aerial imagery (Google / Bing / AGEA) overlaid with the official **Agenzia delle Entrate** cadastral WMS (particelle, fabbricati, numeri particella);
+- view aerial imagery (Google / Bing / AGEA) overlaid with the official **Agenzia delle Entrate** cadastral WMS (particelle, fabbricati, numeri particella) and, optionally, the **Isoipse** (5 m contour lines) WMS from the Regione Lazio geoportal with the elevation value (`cv_liv_q`) labeled along each polyline;
 - search a parcel by *Comune / Foglio / Particella* and have its real polygon highlighted on the map;
 - jump to a specific comune by name (centroid via PostGIS);
 - view the **Punti Fiduciali (TAF)** of the current viewport as a toggleable layer, with popup linking to the official AdE monografia PDF;
@@ -43,6 +43,7 @@ No bundler, no framework, no transpiler. Frontend libraries are loaded from CDN 
 |---|---|
 | Catasto WMS (parcels, buildings, labels) | `https://wms.cartografia.agenziaentrate.gov.it/inspire/wms/ows01.php` — CRS `EPSG:4258`, only responds at zoom ≥ 16 |
 | Ortofoto AGEA 2012 | `https://wms.pcn.minambiente.it/ogc?map=...ortofoto_colore_12.map` |
+| Isoipse Lazio (curve di livello 5 m) | `https://geoportale.regione.lazio.it/geoserver/ows` — layer `geonode:curve_livello`, WMS 1.3.0 / EPSG:3857. Styled via inline `SLD_BODY` that draws the line in `#ffcc33` and labels each contour with the `cv_liv_q` property (LinePlacement + `followLine`/`repeat` vendor options, dark halo for legibility on satellite). Sits in its own `isoipsePane` (z-index 475, above the cadastral label pane). |
 | Google Satellite tiles | `https://{mt0-3}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}` |
 | Bing Satellite tiles | `https://ecn.t{0-3}.tiles.virtualearth.net/tiles/a{quadkey}.jpeg` (quadkey computed client-side) |
 | Parcel lookup DB | Neon Postgres + PostGIS, table `particelle_catastali (comune, foglio, allegato, particella, geometry)` |

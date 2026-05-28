@@ -12,6 +12,7 @@ L'interfaccia è in stile HUD/cyberpunk (cyan neon, rosa, lime) con tutti i coma
 
 ### Mappa e livelli
 - **Sfondi satellitari** commutabili: Google Satellite (default), Bing Satellite, Ortofoto AGEA 2012 (Geoportale Nazionale).
+- **Isoipse (curve di livello)**: layer attivabile, fornito dal WMS del Geoportale Regione Lazio (`geonode:curve_livello`, salto di quota 5 m). Le polilinee sono renderizzate in giallo `#ffcc33` con il valore di quota (`cv_liv_q`) etichettato lungo la curva tramite `SLD_BODY` (LinePlacement + `followLine`, halo scuro per essere leggibili anche sopra l'ortofoto). Disegnato sopra al catasto, così resta visibile.
 - **Catasto Agenzia delle Entrate** via WMS, sovrapposto come tre livelli indipendenti:
   - **Particelle** (confini in bianco)
   - **Fabbricati** (sagome in rosso scuro)
@@ -72,6 +73,7 @@ package.json
 |---|---|
 | WMS Agenzia delle Entrate (`wms.cartografia.agenziaentrate.gov.it`) | Particelle, fabbricati, numeri |
 | WMS Geoportale Nazionale (`wms.pcn.minambiente.it`) | Ortofoto AGEA 2012 |
+| WMS Geoportale Regione Lazio (`geoportale.regione.lazio.it`) | Isoipse (curve di livello a 5 m) |
 | Google Satellite tiles | Sfondo satellitare principale |
 | Bing/Virtual Earth tiles | Sfondo satellitare alternativo |
 | Neon Postgres + PostGIS | Ricerca particella, ricerca comune, punti fiduciali |
