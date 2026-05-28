@@ -169,6 +169,7 @@
       opacity: 0;
       animation: gandalf-fade .18s ease-out forwards;
     }
+    .leaflet-tooltip.gandalf-bubble .gandalf-bubble-inner { display: inline-block; transform-origin: 50% 100%; }
     .leaflet-tooltip.gandalf-bubble::before { display: none !important; }
     .leaflet-tooltip.gandalf-bubble::after {
       content: "";
@@ -1239,6 +1240,8 @@
           `)
           .openOn(map);
 
+        maybeTriggerGandalf(comune, foglio, allegato, particella);
+
         el.drawer.classList.remove("open");
         toast(`Centrata Foglio ${foglioDisplay}, Particella ${particella}`);
 
@@ -1321,6 +1324,8 @@
       const visible = map.getZoom() >= GANDALF_MIN_ZOOM;
       if (visible || gandalfBubbleTimer) {
         if (!map.hasLayer(gandalfOverlay)) gandalfOverlay.addTo(map);
+        // keep bubble scaled when visible
+        try { updateGandalfBubbleScale(); } catch (e) { /* noop */ }
       } else if (map.hasLayer(gandalfOverlay)) {
         map.removeLayer(gandalfOverlay);
       }
@@ -1346,7 +1351,36 @@
         .setLatLng([GANDALF_BOUNDS.getNorth(), GANDALF_CENTER.lng])
         .setContent("Tu non puoi passare!")
         .addTo(map);
+      // wrap content in inner element so we can scale it independently
+      try {
+        const el = gandalfBubble.getElement && gandalfBubble.getElement();
+        if (el) {
+          const inner = document.createElement('div');
+          inner.className = 'gandalf-bubble-inner';
+          inner.innerHTML = el.innerHTML;
+          el.innerHTML = '';
+          el.appendChild(inner);
+          updateGandalfBubbleScale();
+        }
+      } catch (e) { /* ignore in older leaflet */ }
       gandalfBubbleTimer = setTimeout(hideGandalfBubble, 4500);
+    }
+
+    function updateGandalfBubbleScale() {
+      if (!gandalfBubble) return;
+      const el = gandalfBubble.getElement && gandalfBubble.getElement();
+      if (!el) return;
+      const inner = el.querySelector && el.querySelector('.gandalf-bubble-inner');
+      if (!inner) return;
+      try {
+        const nw = map.latLngToLayerPoint(L.latLng(GANDALF_CENTER.lat, GANDALF_BOUNDS.getWest()));
+        const ne = map.latLngToLayerPoint(L.latLng(GANDALF_CENTER.lat, GANDALF_BOUNDS.getEast()));
+        const gifWidth = Math.max(8, Math.abs(ne.x - nw.x));
+        const rect = inner.getBoundingClientRect();
+        const innerWidth = rect.width || 1;
+        const scale = (gifWidth * 0.9) / innerWidth;
+        inner.style.transform = `scale(${scale})`;
+      } catch (e) { /* noop */ }
     }
 
     const GANDALF_KEYS = new Set([
