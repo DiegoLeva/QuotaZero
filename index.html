@@ -161,6 +161,34 @@
     .popup-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
     .popup-actions .btn { min-height: 34px; padding: 0 10px; }
     
+    .comune-search {
+      position: fixed; z-index: 760; left: 50%; top: 70px;
+      width: min(420px, calc(100vw - 28px));
+      transform: translateX(-50%) translateY(-160%);
+      transition: transform .22s ease;
+      border: 1px solid var(--line); border-radius: 10px;
+      background: linear-gradient(135deg, rgba(0,245,255,.16), transparent 40%), linear-gradient(315deg, rgba(255,45,111,.12), transparent 30%), var(--panel-solid);
+      box-shadow: var(--shadow); backdrop-filter: blur(18px);
+      clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+    }
+    .comune-search.show { transform: translateX(-50%) translateY(0); }
+    .comune-search-body { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+    .comune-search-body > .icon { color: var(--accent); text-shadow: 0 0 12px var(--accent); font-size: 22px; flex: 0 0 auto; }
+    .comune-search input {
+      flex: 1 1 auto; min-width: 0; min-height: 38px;
+      padding: 0 10px;
+      color: var(--ink); background: transparent; border: 0; outline: none;
+      font-size: 14px; font-weight: 600;
+    }
+    .comune-search input::placeholder { color: var(--muted); }
+    .comune-search-go, .comune-search-close {
+      width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto;
+      color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+      background: var(--field);
+    }
+    .comune-search-go { color: #001015; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; }
+    .comune-search-go:active, .comune-search-close:active { transform: scale(.94); }
+
     .identify-banner { position: fixed; z-index: 760; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); width: min(620px, calc(100vw - 92px)); transform: translateX(-50%) translateY(140%); border: 1px solid rgba(255,45,111,.65); border-left: 5px solid var(--danger); border-radius: 10px; background: linear-gradient(90deg, rgba(255,45,111,.24), transparent 36%), linear-gradient(180deg, rgba(0,245,255,.14), rgba(5,10,18,.94)), var(--panel-solid); box-shadow: 0 20px 70px rgba(0,0,0,.58), 0 0 30px rgba(255,45,111,.24); backdrop-filter: blur(18px); transition: transform .22s ease; overflow: hidden; }
     .identify-banner.show { transform: translateX(-50%) translateY(0); }
     .identify-banner::before { content: "SCAN"; position: absolute; right: 12px; top: 8px; color: rgba(0,245,255,.3); font-size: 10px; font-weight: 900; letter-spacing: .24em; }
@@ -223,6 +251,8 @@
       .metric.show { transform: translateY(0); }
       .identify-banner { left: 10px; right: 66px; width: auto; transform: translateY(140%); }
       .identify-banner.show { transform: translateY(0); }
+      .comune-search { left: 10px; right: 10px; width: auto; transform: translateY(-160%); }
+      .comune-search.show { transform: translateY(0); }
       .identify-body { grid-template-columns: 1fr 1fr auto; }
       .identify-kv:first-child { grid-column: 1 / -1; }
     }
@@ -479,9 +509,20 @@
   </aside>
 
   <div class="tool-stack">
+    <button class="fab" id="goComuneBtn" title="Vai al comune" aria-label="Vai al comune"><span class="icon">location_city</span></button>
     <button class="fab" id="gpsBtn" title="La mia posizione" aria-label="La mia posizione"><span class="icon">my_location</span></button>
     <button class="fab" id="measureBtn" title="Misura distanza" aria-label="Misura distanza"><span class="icon">straighten</span></button>
     <button class="fab" id="identifyBtn" title="Interroga catasto" aria-label="Interroga catasto"><span class="icon">travel_explore</span></button>
+  </div>
+
+  <div class="comune-search" id="comuneSearch" role="dialog" aria-label="Vai al comune">
+    <div class="comune-search-body">
+      <span class="icon" aria-hidden="true">location_city</span>
+      <input id="comuneSearchInput" type="text" list="comuneSearchList" placeholder="Cerca comune..." autocomplete="off" spellcheck="false">
+      <datalist id="comuneSearchList"></datalist>
+      <button class="comune-search-go" id="comuneSearchGo" title="Vai" aria-label="Vai"><span class="icon">arrow_forward</span></button>
+      <button class="comune-search-close" id="comuneSearchClose" title="Chiudi" aria-label="Chiudi"><span class="icon">close</span></button>
+    </div>
   </div>
 
   <div class="metric" id="metric">
@@ -542,6 +583,12 @@
       fileInput: document.getElementById("fileInput"),
       importedLayers: document.getElementById("importedLayers"),
       gpsBtn: document.getElementById("gpsBtn"),
+      goComuneBtn: document.getElementById("goComuneBtn"),
+      comuneSearch: document.getElementById("comuneSearch"),
+      comuneSearchInput: document.getElementById("comuneSearchInput"),
+      comuneSearchList: document.getElementById("comuneSearchList"),
+      comuneSearchGo: document.getElementById("comuneSearchGo"),
+      comuneSearchClose: document.getElementById("comuneSearchClose"),
       measureBtn: document.getElementById("measureBtn"),
       identifyBtn: document.getElementById("identifyBtn"),
       toggleMeasure: document.getElementById("toggleMeasure"),
@@ -1025,6 +1072,76 @@
       } finally {
         el.loader.classList.remove("active");
       }
+    });
+
+    const comuneOptions = Array.from(el.searchComune.options)
+      .filter(o => o.value)
+      .map(o => ({
+        code: o.value,
+        name: o.textContent.replace(/\s*\([^)]*\)\s*$/, "").trim(),
+        label: o.textContent.trim()
+      }));
+    const comuneByLabel = new Map(comuneOptions.map(c => [c.label.toLowerCase(), c]));
+    const comuneByName = new Map(comuneOptions.map(c => [c.name.toLowerCase(), c]));
+    const comuneByCode = new Map(comuneOptions.map(c => [c.code.toLowerCase(), c]));
+    comuneOptions.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.label;
+      el.comuneSearchList.appendChild(opt);
+    });
+
+    function resolveComune(raw) {
+      const v = (raw || "").trim().toLowerCase();
+      if (!v) return null;
+      return comuneByLabel.get(v) || comuneByName.get(v) || comuneByCode.get(v) || null;
+    }
+
+    function openComuneSearch() {
+      el.comuneSearch.classList.add("show");
+      el.comuneSearchInput.value = "";
+      setTimeout(() => el.comuneSearchInput.focus(), 50);
+    }
+
+    function closeComuneSearch() {
+      el.comuneSearch.classList.remove("show");
+      el.comuneSearchInput.blur();
+    }
+
+    async function goToComune(raw) {
+      const match = resolveComune(raw);
+      if (!match) {
+        toast("Comune non valido. Scegli dalla lista.");
+        return;
+      }
+      el.loader.classList.add("active");
+      toast(`Cerco ${match.name}...`);
+      try {
+        const res = await fetch(`/api/cerca-comune?comune=${encodeURIComponent(match.code)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Comune non trovato.");
+        map.setView(data.centro, 16, { animate: true, duration: 1.2 });
+        closeComuneSearch();
+        toast(`Centrato su ${match.name}`);
+      } catch (err) {
+        toast(err.message, 4000);
+        console.error("Errore Ricerca Comune:", err);
+      } finally {
+        el.loader.classList.remove("active");
+      }
+    }
+
+    el.goComuneBtn.addEventListener("click", () => {
+      if (el.comuneSearch.classList.contains("show")) closeComuneSearch();
+      else openComuneSearch();
+    });
+    el.comuneSearchClose.addEventListener("click", closeComuneSearch);
+    el.comuneSearchGo.addEventListener("click", () => goToComune(el.comuneSearchInput.value));
+    el.comuneSearchInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); goToComune(el.comuneSearchInput.value); }
+      else if (e.key === "Escape") closeComuneSearch();
+    });
+    el.comuneSearchInput.addEventListener("change", () => {
+      if (resolveComune(el.comuneSearchInput.value)) goToComune(el.comuneSearchInput.value);
     });
 
     setIdentifyMode(true);
