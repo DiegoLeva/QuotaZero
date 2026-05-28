@@ -3,7 +3,6 @@ const TILE_CACHE = "quotazero-tiles-v1";
 const TILE_HOST_PATTERNS = [
   /\.google\.com$/,
   /\.tiles\.virtualearth\.net$/,
-  /^wms\.pcn\.minambiente\.it$/,
   /^wms\.cartografia\.agenziaentrate\.gov\.it$/
 ];
 

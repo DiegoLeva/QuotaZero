@@ -120,6 +120,8 @@
     .global-opacity-row strong { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
 
     .bg-switcher { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .bg-switcher-4 { grid-template-columns: repeat(2, 1fr); }
+    @media (min-width: 420px) { .bg-switcher-4 { grid-template-columns: repeat(4, 1fr); } }
     .bg-opt {
       display: flex; align-items: center; justify-content: center; gap: 6px;
       padding: 9px 6px; border: 1px solid var(--line); border-radius: 8px;
@@ -597,7 +599,7 @@
 
       <section class="section">
         <div class="section-title">Sfondo</div>
-        <div class="bg-switcher">
+        <div class="bg-switcher bg-switcher-4">
           <button type="button" class="bg-opt" data-bg="google">
             <span class="icon">satellite_alt</span> Google
           </button>
@@ -606,6 +608,9 @@
           </button>
           <button type="button" class="bg-opt" data-bg="agea">
             <span class="icon">terrain</span> AGEA
+          </button>
+          <button type="button" class="bg-opt" data-bg="none">
+            <span class="icon">visibility_off</span> Nessuno
           </button>
         </div>
       </section>
@@ -921,7 +926,7 @@
 
     const bingSat = new BingSatellite("", { maxZoom: 23, subdomains: ["0", "1", "2", "3"], pane: "bingPane", opacity: prefs.background.opacity });
 
-    const ageaOrtofoto = L.tileLayer.wms(PCN_AGEA_URL, {
+    const ageaOrtofoto = L.tileLayer.wms(`/api/wms-proxy?url=${encodeURIComponent(PCN_AGEA_URL)}`, {
       layers: "OI.ORTOIMMAGINI.2012.33", format: "image/jpeg", transparent: false, version: "1.3.0",
       crs: L.CRS.EPSG3857, maxZoom: 23, pane: "ageaPane", tileSize: 512, updateWhenIdle: true,
       opacity: prefs.background.opacity
@@ -1240,7 +1245,7 @@
           if (map.hasLayer(layer)) map.removeLayer(layer);
         }
       }
-      el.bgOpts.forEach(b => b.classList.toggle("active", b.dataset.bg === active));
+      el.bgOpts.forEach(b => b.classList.toggle("active", b.dataset.bg === (active || "none")));
     }
 
     function applyGlobalOpacity() {
@@ -1746,8 +1751,8 @@
 
     el.bgOpts.forEach(btn => btn.addEventListener("click", () => {
       const v = btn.dataset.bg;
-      if (!BG_LAYERS[v]) return;
-      prefs.background.active = v;
+      if (v !== "none" && !BG_LAYERS[v]) return;
+      prefs.background.active = v === "none" ? null : v;
       applyBackground();
       savePrefs();
     }));

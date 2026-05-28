@@ -87,16 +87,21 @@ Returns `{ centro: [lat, lng] }` — centroid of the **union** of all particelle
 
 ## Backend contract — `/api/wms-proxy`
 
-`GET /api/wms-proxy?url=<encoded OGC URL>`
+`GET /api/wms-proxy?url=<encoded OGC base URL>&<extra WMS params…>`
 
-Pass-through proxy that fetches the URL server-side and returns the body, with permissive CORS headers. Originally added to bypass CORS on the Agenzia delle Entrate WMS for `GetFeatureInfo` calls (the frontend falls back to a direct fetch if the proxy fails on that path). Now also used by the **Isoipse WFS** flow against the Regione Lazio GeoServer, which does not send CORS headers — there the call **must** go through the proxy or the browser blocks it.
+Pass-through OGC proxy. Reads the target endpoint from the `url` query parameter and forwards every other query parameter onto it before fetching. Sends permissive CORS headers and handles binary responses (images, PDFs) with `arrayBuffer` so they aren't corrupted by text decoding. Used by:
+- **AdE WMS GetFeatureInfo** (long-press identify): frontend falls back to a direct fetch if the proxy fails on that path.
+- **Isoipse WFS** against the Regione Lazio GeoServer, which doesn't send CORS headers — the call must go through the proxy or the browser blocks it.
+- **AGEA WMS tiles** (Geoportale Nazionale Ortofoto 2012): the upstream server redirects HTTPS requests to HTTP for tile delivery, which the browser blocks as Mixed Content. The proxy fetches server-side and returns the JPEG over HTTPS. Frontend constructs the layer with `L.tileLayer.wms("/api/wms-proxy?url=" + encodeURIComponent(PCN_AGEA_URL), {...})` — Leaflet appends `LAYERS/BBOX/WIDTH/...` as extra query params, and the proxy stitches them onto the WMS endpoint. The proxy sets `Cache-Control: public, max-age=86400, s-maxage=604800` on image responses so Vercel CDN can absorb most of the load.
+
+Because AGEA now flows through the proxy (same-origin), `wms.pcn.minambiente.it` is **no longer** in the `sw.js` tile host patterns.
 
 ## Conventions worth keeping
 
 - **No comments in code unless the *why* is non-obvious.** The repo's existing code already follows this — keep it that way.
 - All UI strings are **in Italian**. So are commit messages and toasts.
 - Visual style is a deliberate **cyberpunk/HUD** look (neon cyan `#00f5ff`, danger pink `#ff2d6f`, lime `#a5ff2f`). CSS variables live at the top of the `<style>` block in `index.html`. Don't drift away from this palette without asking.
-- State persists in `localStorage` under key `quotazero_state_v1` (current map view + imported KMLs, saved by the "Salva area di rilievo" button). **Per-layer UI preferences** (visibility, opacity, color for each toggleable layer — google/bing/agea/parcels/buildings/labels/fiduciali/isoipse) persist independently under key `quotazero_prefs_v1`, auto-saved on every change via the "Personalizza colore e opacità" dialog or any toggle. Offline tile cache uses the Cache API under name `quotazero-tiles-v1`. **Bump the version suffix** if you make a breaking change to any of these schemas.
+- State persists in `localStorage` under key `quotazero_state_v1` (current map view + imported KMLs, saved by the "Salva area di rilievo" button). **UI preferences** persist independently under key `quotazero_prefs_v1`, auto-saved on every change. Schema: `{ background: { active: "google"|"bing"|"agea", opacity: 0..1 }, globalOpacity: 0..1, parcels: {visible, opacity, color}, buildings: {...}, labels: {...}, fiduciali: {...}, isoipse: {visible, opacity, color, labels} }`. Background is a single mutually-exclusive selector (the chosen base layer is added to the map, the other two are removed). The **effective opacity** of every overlay layer (everything except background) is `prefs[key].opacity * prefs.globalOpacity` — the global slider acts as a master multiplier on top of per-layer fine-tuning. `prefs.isoipse.labels` is a boolean that toggles the contour-value tooltips without removing the polylines. Offline tile cache uses the Cache API under name `quotazero-tiles-v1`. **Bump the version suffix** if you make a breaking change to any of these schemas.
 - Layer z-index is managed via named Leaflet panes — see the array at ~line 581 of `index.html`. New raster layers should go in a dedicated pane, not the default one.
 
 ## Keeping the docs in sync
