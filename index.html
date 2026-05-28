@@ -539,9 +539,12 @@
       <section class="section">
         <div class="section-title">Offline Area KML</div>
         <div class="btn-grid">
-          <button class="btn blue" id="saveOffline"><span class="icon">download</span> Salva per rilievo</button>
-          <button class="btn warn" id="loadOffline"><span class="icon">cloud_off</span> Ricarica offline</button>
+          <button class="btn blue" id="saveOffline"><span class="icon">download</span> Salva area di rilievo</button>
+          <button class="btn primary" id="loadOffline"><span class="icon">restore</span> Ripristina salvataggio</button>
         </div>
+        <button class="btn warn full" id="clearOffline" style="margin-top:8px">
+          <span class="icon">delete_sweep</span> Cancella dati offline
+        </button>
         <p class="hint">Calcola l'area di tutti i KML importati e scarica mappa catastale e satellitare in alta definizione per uso senza internet sul campo.</p>
         <div id="offlineInfo" class="hint"></div>
       </section>
@@ -670,6 +673,7 @@
       goFrosinone: document.getElementById("goFrosinone"),
       saveOffline: document.getElementById("saveOffline"),
       loadOffline: document.getElementById("loadOffline"),
+      clearOffline: document.getElementById("clearOffline"),
       offlineInfo: document.getElementById("offlineInfo"),
       identifyBanner: document.getElementById("identifyBanner"),
       idComune: document.getElementById("idComune"),
@@ -1168,6 +1172,19 @@
       toast(cached ? `Area rilievo salvata! ${cached} tasselli mappa memorizzati offline.` : "Errore salvataggio file mappa offline.");
     }
 
+    async function clearOfflineData() {
+      const hasSnapshot = !!localStorage.getItem(STORAGE_KEY);
+      const hasCache = "caches" in window && await caches.has(TILE_CACHE);
+      if (!hasSnapshot && !hasCache) { toast("Nessun dato offline da cancellare."); return; }
+      if (!confirm("Cancellare salvataggio e tile della mappa memorizzati per uso offline?")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      if ("caches" in window) {
+        try { await caches.delete(TILE_CACHE); } catch (e) { console.warn(e); }
+      }
+      el.offlineInfo.textContent = "";
+      toast("Dati offline cancellati.");
+    }
+
     el.panelBtn.addEventListener("click", () => el.drawer.classList.add("open"));
     el.closeDrawer.addEventListener("click", () => el.drawer.classList.remove("open"));
     el.closeIdentify.addEventListener("click", () => el.identifyBanner.classList.remove("show"));
@@ -1198,8 +1215,9 @@
     el.saveOffline.addEventListener("click", saveOffline);
     el.loadOffline.addEventListener("click", () => {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) { restoreState(JSON.parse(raw)); toast("Aree rilievo offline ricaricate."); } else toast("Nessun dato salvato.");
+      if (raw) { restoreState(JSON.parse(raw)); toast("Salvataggio ripristinato."); } else toast("Nessun salvataggio trovato.");
     });
+    el.clearOffline.addEventListener("click", clearOfflineData);
 
     map.on("click", e => { if (state.measuring) { state.measurePoints.push(e.latlng); refreshMeasure(); } });
     map.on("contextmenu", e => identifyParcel(e.latlng));
