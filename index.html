@@ -535,7 +535,6 @@
           <input id="catastoOpacity" type="range" min="0" max="1" step="0.05" value="0.78" aria-label="Opacita catasto">
           <strong id="opacityValue">78%</strong>
         </div>
-        <button class="btn full" id="goFrosinone"><span class="icon">center_focus_strong</span> Zona test catasto</button>
       </section>
 
       <section class="section">
@@ -697,7 +696,6 @@
       metricValue: document.getElementById("metricValue"),
       clearMeasure: document.getElementById("clearMeasure"),
       toast: document.getElementById("toast"),
-      goFrosinone: document.getElementById("goFrosinone"),
       saveOffline: document.getElementById("saveOffline"),
       loadOffline: document.getElementById("loadOffline"),
       clearOffline: document.getElementById("clearOffline"),
@@ -1330,7 +1328,6 @@
     el.catastoOpacity.addEventListener("input", e => {
       const v = Number(e.target.value); cadastreLayers.forEach(l => l.setOpacity(v)); el.opacityValue.textContent = `${Math.round(v * 100)}%`;
     });
-    el.goFrosinone.addEventListener("click", () => map.setView([41.639, 13.341], 18));
     el.fileInput.addEventListener("change", e => importFiles(e.target.files));
     el.clearImported.addEventListener("click", clearImportedLayers);
     el.importedLayers.addEventListener("change", e => {
