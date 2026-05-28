@@ -1007,7 +1007,7 @@
           typeName: "geonode:curve_livello",
           outputFormat: "application/json",
           srsName: "EPSG:4326",
-          bbox: `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
+          bbox: `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()},EPSG:4326`,
           maxFeatures: String(ISOIPSE_MAX_FEATURES)
         });
         const wfsUrl = `${LAZIO_WFS_URL}?${params}`;
