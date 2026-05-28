@@ -423,7 +423,7 @@
         <div class="row">
           <div class="row-main">
             <div class="row-title">Punti Fiduciali</div>
-            <div class="row-sub">Monografie TAF del comune selezionato</div>
+            <div class="row-sub">Monografie TAF, zoom 14+</div>
           </div>
           <label class="switch" title="Mostra/nascondi punti fiduciali">
             <input id="toggleFiduciali" type="checkbox">
@@ -582,7 +582,7 @@
       userMarker: null,
       pressTimer: null,
       lastPressLatLng: null,
-      fiduciali: { visible: false, loadedComune: null, loading: false }
+      fiduciali: { visible: false, loading: false, fetchAbort: null, debounceTimer: null }
     };
 
     const el = {
@@ -793,28 +793,39 @@
       }
     }
 
-    async function loadFiduciari(comune) {
-      if (!comune) {
+    const FIDUCIARI_MIN_ZOOM = 14;
+
+    async function loadFiduciariByBbox() {
+      if (!state.fiduciali.visible) return;
+      if (map.getZoom() < FIDUCIARI_MIN_ZOOM) {
         fiduciariLayer.clearLayers();
-        state.fiduciali.loadedComune = null;
-        toast("Seleziona un comune nella ricerca per vedere i punti fiduciali.");
         return;
       }
-      if (state.fiduciali.loadedComune === comune && fiduciariLayer.getLayers().length > 0) return;
+      if (state.fiduciali.fetchAbort) state.fiduciali.fetchAbort.abort();
+      const ctrl = new AbortController();
+      state.fiduciali.fetchAbort = ctrl;
       state.fiduciali.loading = true;
       try {
-        const res = await fetch(`/api/punti-fiduciali?comune=${encodeURIComponent(comune)}`);
+        const b = map.getBounds();
+        const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map(n => n.toFixed(6)).join(",");
+        const res = await fetch(`/api/punti-fiduciali?bbox=${encodeURIComponent(bbox)}`, { signal: ctrl.signal });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Errore caricamento punti fiduciali.");
+        if (!state.fiduciali.visible) return;
         renderFiduciari(data.punti || []);
-        state.fiduciali.loadedComune = comune;
-        toast(`${(data.punti || []).length} punti fiduciali per ${comune}.`);
       } catch (err) {
+        if (err.name === "AbortError") return;
         console.error("Errore Punti Fiduciali:", err);
         toast("Impossibile caricare i punti fiduciali.");
       } finally {
         state.fiduciali.loading = false;
+        if (state.fiduciali.fetchAbort === ctrl) state.fiduciali.fetchAbort = null;
       }
+    }
+
+    function scheduleFiduciariReload() {
+      clearTimeout(state.fiduciali.debounceTimer);
+      state.fiduciali.debounceTimer = setTimeout(loadFiduciariByBbox, 280);
     }
 
     function setFiduciariMode(visible) {
@@ -822,9 +833,15 @@
       el.toggleFiduciali.checked = visible;
       if (visible) {
         if (!map.hasLayer(fiduciariLayer)) map.addLayer(fiduciariLayer);
-        loadFiduciari(el.searchComune.value);
+        if (map.getZoom() < FIDUCIARI_MIN_ZOOM) {
+          toast(`Zoom almeno ${FIDUCIARI_MIN_ZOOM} per vedere i punti fiduciali.`);
+        }
+        loadFiduciariByBbox();
       } else {
+        if (state.fiduciali.fetchAbort) state.fiduciali.fetchAbort.abort();
+        clearTimeout(state.fiduciali.debounceTimer);
         if (map.hasLayer(fiduciariLayer)) map.removeLayer(fiduciariLayer);
+        fiduciariLayer.clearLayers();
       }
     }
 
@@ -1081,9 +1098,7 @@
     el.toggleBuildings.addEventListener("change", e => setLayer(buildingsLayer, e.target.checked));
     el.toggleLabels.addEventListener("change", e => setLayer(labelsLayer, e.target.checked));
     el.toggleFiduciali.addEventListener("change", e => setFiduciariMode(e.target.checked));
-    el.searchComune.addEventListener("change", () => {
-      if (state.fiduciali.visible) loadFiduciari(el.searchComune.value);
-    });
+    map.on("moveend zoomend", () => { if (state.fiduciali.visible) scheduleFiduciariReload(); });
     el.catastoOpacity.addEventListener("input", e => {
       const v = Number(e.target.value); cadastreLayers.forEach(l => l.setOpacity(v)); el.opacityValue.textContent = `${Math.round(v * 100)}%`;
     });
@@ -1220,10 +1235,6 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Comune non trovato.");
         map.setView(data.centro, 16, { animate: true, duration: 1.2 });
-        if (el.searchComune.value !== match.code) {
-          el.searchComune.value = match.code;
-          if (state.fiduciali.visible) loadFiduciari(match.code);
-        }
         toast(`Centrato su ${match.name}`);
       } catch (err) {
         toast(err.message, 4000);
