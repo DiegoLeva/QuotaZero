@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <style>
     :root {
@@ -311,7 +312,62 @@
     .popup-title { margin: 0 0 8px; font-weight: 800; }
     .popup-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
     .popup-actions .btn { min-height: 34px; padding: 0 10px; }
-    
+
+    .fab.fab-pf { background: linear-gradient(145deg, rgba(255,45,111,.34), rgba(255,45,111,.12)), var(--panel); border-color: rgba(255,45,111,.6); color: #ffd6e4; }
+    .fab.fab-pf.active { color: #1a0009; background: linear-gradient(135deg, var(--danger), #ff7aa6); }
+
+    .pf-crosshair {
+      position: fixed; z-index: 740; left: 50%; top: 50%; width: 60px; height: 60px;
+      transform: translate(-50%, -50%); pointer-events: none; display: none;
+    }
+    .pf-crosshair.show { display: block; }
+    .pf-crosshair::before, .pf-crosshair::after {
+      content: ""; position: absolute; background: var(--danger); box-shadow: 0 0 6px rgba(0,0,0,.8);
+    }
+    .pf-crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+    .pf-crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+    .pf-crosshair > i {
+      position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%);
+      border: 2px solid var(--danger); border-radius: 50%; background: rgba(255,45,111,.18); box-shadow: 0 0 6px rgba(0,0,0,.8);
+    }
+
+    .pf-placebar {
+      position: fixed; z-index: 745; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom));
+      transform: translateX(-50%) translateY(160px); width: min(460px, calc(100vw - 28px));
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 14px; border: 1px solid rgba(255,45,111,.6); border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255,45,111,.22), var(--panel-solid)); box-shadow: var(--shadow);
+      backdrop-filter: blur(14px); transition: transform .22s ease;
+    }
+    .pf-placebar.show { transform: translateX(-50%) translateY(0); }
+    .pf-placebar-coords { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink); }
+    .pf-placebar-actions { display: flex; gap: 8px; }
+    .pf-placebar .btn { min-height: 38px; }
+
+    .pf-modal { position: fixed; z-index: 1150; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(1,4,11,.7); backdrop-filter: blur(6px); }
+    .pf-modal.show { display: flex; }
+    .pf-modal-box { width: min(460px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel-solid); box-shadow: var(--shadow); padding: 16px; }
+    .pf-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .pf-modal-head h3 { margin: 0; color: var(--danger); font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .pf-modal-close { width: 36px; height: 36px; display: grid; place-items: center; color: var(--ink); border: 1px solid rgba(255,255,255,.18); border-radius: 8px; background: rgba(255,255,255,.08); cursor: pointer; }
+    .pf-modal-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .pf-meta-kv { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); }
+    .pf-meta-kv span { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .pf-meta-kv strong { display: block; margin-top: 2px; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .pf-field { display: block; margin-bottom: 12px; }
+    .pf-field span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 5px; }
+    .pf-field input { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--field); color: var(--ink); font-size: 14px; }
+    .pf-photos { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .pf-photo-btn { position: relative; overflow: hidden; }
+    .pf-photo-btn.has-file { border-color: var(--accent-2); color: var(--accent-2); }
+    .pf-photo-previews { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .pf-photo-previews img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+    .pf-modal-actions { display: flex; gap: 8px; }
+
+    .rilievo-marker-wrap { background: none; border: none; }
+    .rilievo-marker { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--c, #ff2d6f); border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.55); }
+    .rilievo-marker .icon { font-size: 16px; color: #1a0009; }
+
     .comune-search {
       position: fixed; z-index: 760; left: 50%; top: 70px;
       width: min(420px, calc(100vw - 28px));
@@ -587,6 +643,16 @@
         </div>
         <div class="row">
           <div class="row-main">
+            <div class="row-title">PF rilievo (miei)</div>
+            <div class="row-sub">Punti fiduciali aggiunti in campo</div>
+          </div>
+          <label class="switch" title="Mostra/nascondi i miei punti fiduciali">
+            <input id="toggleRilievo" type="checkbox" checked>
+            <span></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="row-main">
             <div class="row-title">Particelle</div>
             <div class="row-sub">Confini catastali, zoom 16+</div>
           </div>
@@ -687,6 +753,7 @@
   </aside>
 
   <div class="tool-stack">
+    <button class="fab fab-pf" id="addPfBtn" title="Aggiungi Punto Fiduciale" aria-label="Aggiungi Punto Fiduciale"><span class="icon">add_location_alt</span></button>
     <button class="fab" id="goComuneBtn" title="Vai al comune" aria-label="Vai al comune"><span class="icon">location_city</span></button>
     <button class="fab" id="gpsBtn" title="La mia posizione" aria-label="La mia posizione"><span class="icon">my_location</span></button>
     <button class="fab" id="measureBtn" title="Misura distanza" aria-label="Misura distanza"><span class="icon">straighten</span></button>
@@ -743,6 +810,49 @@
     </div>
   </div>
 
+  <div class="pf-crosshair" id="pfCrosshair" aria-hidden="true"><i></i></div>
+
+  <div class="pf-placebar" id="pfPlaceBar" aria-hidden="true">
+    <div class="pf-placebar-coords" id="pfPlaceCoords">--</div>
+    <div class="pf-placebar-actions">
+      <button class="btn" id="pfPlaceCancel" type="button"><span class="icon">close</span> Annulla</button>
+      <button class="btn primary" id="pfPlaceOk" type="button"><span class="icon">check</span> OK</button>
+    </div>
+  </div>
+
+  <div class="pf-modal" id="pfModal" aria-hidden="true">
+    <div class="pf-modal-box">
+      <div class="pf-modal-head">
+        <h3 id="pfModalTitle">Nuovo Punto Fiduciale</h3>
+        <button class="pf-modal-close" id="pfModalClose" aria-label="Chiudi"><span class="icon">close</span></button>
+      </div>
+      <div class="pf-modal-meta">
+        <div class="pf-meta-kv"><span>Coordinate</span><strong id="pfMetaCoords">--</strong></div>
+        <div class="pf-meta-kv"><span>Comune</span><strong id="pfMetaComune">--</strong></div>
+        <div class="pf-meta-kv"><span>Foglio</span><strong id="pfMetaFoglio">--</strong></div>
+        <div class="pf-meta-kv"><span>Particella</span><strong id="pfMetaParticella">--</strong></div>
+      </div>
+      <label class="pf-field">
+        <span>Nome del punto</span>
+        <input id="pfName" type="text" placeholder="Lascia vuoto per nome automatico" autocomplete="off">
+      </label>
+      <div class="pf-photos">
+        <label class="btn full pf-photo-btn">
+          <span class="icon">add_a_photo</span> <span id="pfPhotoSpigoloLabel">Foto spigolo</span>
+          <input id="pfPhotoSpigolo" class="file-input" type="file" accept="image/*">
+        </label>
+        <label class="btn full pf-photo-btn">
+          <span class="icon">add_a_photo</span> <span id="pfPhotoDettaglioLabel">Foto dettaglio</span>
+          <input id="pfPhotoDettaglio" class="file-input" type="file" accept="image/*">
+        </label>
+      </div>
+      <div class="pf-photo-previews" id="pfPhotoPreviews"></div>
+      <div class="pf-modal-actions">
+        <button class="btn warn full" id="pfSave" type="button"><span class="icon">save</span> Salva punto</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
   <div class="hud-loader" id="hudLoader"><div class="spinner"></div><span>Elaborazione...</span></div>
   
@@ -764,6 +874,7 @@
       buildings:     { visible: true,  opacity: 1.00, color: "#7b1118" },
       labels:        { visible: true,  opacity: 1.00, color: "#ffcc33" },
       fiduciali:     { visible: false, opacity: 0.95, color: "#00f5ff" },
+      rilievo:       { visible: true,  opacity: 1.00, color: "#ff2d6f" },
       isoipse:       { visible: false, opacity: 1.00, color: "#a5ff2f", labels: true }
     };
 
@@ -773,6 +884,7 @@
       { key: "buildings",  name: "Fabbricati",        hasColor: true  },
       { key: "labels",     name: "Numeri particelle", hasColor: true  },
       { key: "fiduciali",  name: "Punti Fiduciali",   hasColor: true  },
+      { key: "rilievo",    name: "PF rilievo (miei)", hasColor: true  },
       { key: "isoipse",    name: "Isoipse",           hasColor: true, hasLabelsToggle: true }
     ];
 
@@ -817,7 +929,8 @@
       pressTimer: null,
       lastPressLatLng: null,
       fiduciali: { visible: false, loading: false, fetchAbort: null, debounceTimer: null },
-      isoipse: { visible: false, loading: false, fetchAbort: null, debounceTimer: null, lastFeatures: [] }
+      isoipse: { visible: false, loading: false, fetchAbort: null, debounceTimer: null, lastFeatures: [] },
+      rilievo: { points: new Map(), fetchAbort: null, debounceTimer: null, placing: false, editId: null, photos: { spigolo: null, dettaglio: null } }
     };
 
     const el = {
@@ -832,6 +945,27 @@
       toggleBuildings: document.getElementById("toggleBuildings"),
       toggleLabels: document.getElementById("toggleLabels"),
       toggleFiduciali: document.getElementById("toggleFiduciali"),
+      toggleRilievo: document.getElementById("toggleRilievo"),
+      addPfBtn: document.getElementById("addPfBtn"),
+      pfCrosshair: document.getElementById("pfCrosshair"),
+      pfPlaceBar: document.getElementById("pfPlaceBar"),
+      pfPlaceCoords: document.getElementById("pfPlaceCoords"),
+      pfPlaceOk: document.getElementById("pfPlaceOk"),
+      pfPlaceCancel: document.getElementById("pfPlaceCancel"),
+      pfModal: document.getElementById("pfModal"),
+      pfModalTitle: document.getElementById("pfModalTitle"),
+      pfModalClose: document.getElementById("pfModalClose"),
+      pfMetaCoords: document.getElementById("pfMetaCoords"),
+      pfMetaComune: document.getElementById("pfMetaComune"),
+      pfMetaFoglio: document.getElementById("pfMetaFoglio"),
+      pfMetaParticella: document.getElementById("pfMetaParticella"),
+      pfName: document.getElementById("pfName"),
+      pfPhotoSpigolo: document.getElementById("pfPhotoSpigolo"),
+      pfPhotoDettaglio: document.getElementById("pfPhotoDettaglio"),
+      pfPhotoSpigoloLabel: document.getElementById("pfPhotoSpigoloLabel"),
+      pfPhotoDettaglioLabel: document.getElementById("pfPhotoDettaglioLabel"),
+      pfPhotoPreviews: document.getElementById("pfPhotoPreviews"),
+      pfSave: document.getElementById("pfSave"),
       openLayerSettings: document.getElementById("openLayerSettings"),
       layerSettingsModal: document.getElementById("layerSettingsModal"),
       layerSettingsClose: document.getElementById("layerSettingsClose"),
@@ -908,6 +1042,7 @@
       ["parcelPane", 420],
       ["buildingPane", 440],
       ["fiduciariPane", 460],
+      ["rilievoPane", 466],
       ["labelPane", 470],
       ["isoipsePane", 475]
     ].forEach(([name, zIndex]) => {
@@ -981,6 +1116,8 @@
     const isoipseLayer = L.layerGroup([], { pane: "isoipsePane" });
 
     const fiduciariLayer = L.layerGroup([], { pane: "fiduciariPane" });
+
+    const rilievoLayer = L.layerGroup([], { pane: "rilievoPane" });
 
     const cadastreLayers = [parcelsLayer, buildingsLayer, labelsLayer];
     let catastoTileErrors = 0;
@@ -1113,6 +1250,431 @@
       }
     }
 
+    // ===================== PUNTI FIDUCIALI DI RILIEVO (nostri) =====================
+
+    function rilievoDefaultName(p) {
+      if (p.nome && String(p.nome).trim()) return String(p.nome).trim();
+      return `PF ${p.comune || "NA"}-${p.seq}`;
+    }
+
+    function renderRilievo() {
+      rilievoLayer.clearLayers();
+      const { color } = prefs.rilievo;
+      const eff = effOpacity("rilievo");
+      for (const p of state.rilievo.points.values()) {
+        if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
+        const marker = L.marker([p.lat, p.lng], {
+          pane: "rilievoPane",
+          icon: L.divIcon({
+            className: "rilievo-marker-wrap",
+            html: `<div class="rilievo-marker" style="--c:${color};opacity:${eff}"><span class="icon">push_pin</span></div>`,
+            iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14]
+          })
+        });
+        marker.bindPopup(() => buildRilievoPopup(p));
+        marker.addTo(rilievoLayer);
+      }
+    }
+
+    function buildRilievoPopup(p) {
+      const name = escapeHtml(rilievoDefaultName(p));
+      const dt = p.createdAt ? new Date(p.createdAt).toLocaleString("it-IT") : "";
+      return `
+        <div class="popup-title" style="color:#ff2d6f;font-weight:800;margin-bottom:4px;">${name}</div>
+        <div class="row-sub">${escapeHtml(p.comune || "-")} · PF #${p.seq}</div>
+        <div class="row-sub">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</div>
+        ${dt ? `<div class="row-sub">${escapeHtml(dt)}</div>` : ""}
+        <div class="popup-actions">
+          <button class="btn pf-popup-btn" data-act="edit" data-id="${p.id}"><span class="icon">edit</span> Modifica</button>
+          <button class="btn blue pf-popup-btn" data-act="zip" data-id="${p.id}"><span class="icon">download</span> Scarica</button>
+          <button class="btn warn pf-popup-btn" data-act="del" data-id="${p.id}"><span class="icon">delete</span> Elimina</button>
+        </div>`;
+    }
+
+    async function loadRilievoByBbox() {
+      if (!prefs.rilievo.visible) return;
+      if (state.rilievo.fetchAbort) state.rilievo.fetchAbort.abort();
+      const ctrl = new AbortController();
+      state.rilievo.fetchAbort = ctrl;
+      try {
+        const b = map.getBounds();
+        const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map(n => n.toFixed(6)).join(",");
+        const res = await fetch(`/api/punti-rilievo?bbox=${encodeURIComponent(bbox)}`, { signal: ctrl.signal });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Errore caricamento punti.");
+        for (const p of (data.punti || [])) {
+          const existing = state.rilievo.points.get(p.id);
+          const photos = existing ? existing.photos : { spigolo: null, dettaglio: null };
+          state.rilievo.points.set(p.id, { ...p, photos });
+        }
+        renderRilievo();
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        console.error("Errore PF rilievo:", err);
+      } finally {
+        if (state.rilievo.fetchAbort === ctrl) state.rilievo.fetchAbort = null;
+      }
+    }
+
+    function scheduleRilievoReload() {
+      clearTimeout(state.rilievo.debounceTimer);
+      state.rilievo.debounceTimer = setTimeout(loadRilievoByBbox, 300);
+    }
+
+    function setRilievoMode(visible) {
+      prefs.rilievo.visible = visible;
+      el.toggleRilievo.checked = visible;
+      if (visible) {
+        if (!map.hasLayer(rilievoLayer)) map.addLayer(rilievoLayer);
+        loadRilievoByBbox();
+      } else {
+        if (state.rilievo.fetchAbort) state.rilievo.fetchAbort.abort();
+        clearTimeout(state.rilievo.debounceTimer);
+        if (map.hasLayer(rilievoLayer)) map.removeLayer(rilievoLayer);
+      }
+    }
+
+    // ---- Modalità posizionamento (mirino tipo Google Earth) ----
+
+    function updatePfPlaceCoords() {
+      const c = map.getCenter();
+      el.pfPlaceCoords.textContent = `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
+    }
+
+    function startPfPlacement() {
+      if (state.rilievo.placing) return;
+      state.rilievo.placing = true;
+      state.rilievo.editId = null;
+      el.addPfBtn.classList.add("active");
+      el.pfCrosshair.classList.add("show");
+      el.pfPlaceBar.classList.add("show");
+      updatePfPlaceCoords();
+      toast("Sposta la mappa sotto il mirino, poi premi OK.");
+    }
+
+    function cancelPfPlacement() {
+      state.rilievo.placing = false;
+      el.addPfBtn.classList.remove("active");
+      el.pfCrosshair.classList.remove("show");
+      el.pfPlaceBar.classList.remove("show");
+    }
+
+    function confirmPfPlacement() {
+      const c = map.getCenter();
+      cancelPfPlacement();
+      openPfModal({ latlng: { lat: c.lat, lng: c.lng } });
+    }
+
+    // ---- Reverse lookup catastale (best-effort) ----
+
+    async function reverseParcel(latlng) {
+      if (map.getZoom() < 16) return null;
+      const meters = Math.max(1.5, 22 - map.getZoom());
+      const latD = meters / 111320;
+      const lngD = meters / (111320 * Math.max(.25, Math.cos(latlng.lat * Math.PI / 180)));
+      const bbox = [latlng.lng - lngD, latlng.lat - latD, latlng.lng + lngD, latlng.lat + latD].join(",");
+      const url = `${WMS_URL}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo&LAYERS=CP.CadastralParcel&QUERY_LAYERS=CP.CadastralParcel&STYLES=&SRS=EPSG:4258&BBOX=${bbox}&WIDTH=9&HEIGHT=9&X=5&Y=5&FEATURE_COUNT=10&INFO_FORMAT=text/html`;
+      let text = await fetchFeatureInfoText(url);
+      text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      const f = text.match(/(?:FOGLIO|Foglio)\s*[:=]?\s*([A-Za-z0-9]+)/);
+      const p = text.match(/(?:PARTICELLA|Particella)\s*[:=]?\s*([A-Za-z0-9/]+)/);
+      const ref = text.match(/NationalCadastralReference\s+([A-Z0-9]+)_([A-Z0-9]+)\.([A-Z0-9/]+)/i);
+      if (!(f || p || ref)) return null;
+      const fglRaw = f?.[1] || ref?.[2] || "-";
+      const { foglio, allegato } = normalizeFoglio(fglRaw);
+      const particella = p?.[1] || ref?.[3] || "-";
+      return { comune: ref?.[1] || "-", foglio, allegato, particella };
+    }
+
+    // ---- Modale informazioni punto ----
+
+    function resetPfPhotoUI() {
+      el.pfPhotoSpigolo.value = "";
+      el.pfPhotoDettaglio.value = "";
+      refreshPfPhotoUI();
+    }
+
+    function refreshPfPhotoUI() {
+      const ph = state.rilievo.photos;
+      el.pfPhotoSpigoloLabel.textContent = ph.spigolo ? "Foto spigolo ✓" : "Foto spigolo";
+      el.pfPhotoDettaglioLabel.textContent = ph.dettaglio ? "Foto dettaglio ✓" : "Foto dettaglio";
+      el.pfPhotoSpigolo.closest(".pf-photo-btn").classList.toggle("has-file", !!ph.spigolo);
+      el.pfPhotoDettaglio.closest(".pf-photo-btn").classList.toggle("has-file", !!ph.dettaglio);
+      el.pfPhotoPreviews.innerHTML = "";
+      for (const key of ["spigolo", "dettaglio"]) {
+        if (!ph[key]) continue;
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(ph[key]);
+        img.alt = key;
+        el.pfPhotoPreviews.appendChild(img);
+      }
+    }
+
+    async function openPfModal({ latlng, editPoint }) {
+      state.rilievo.photos = { spigolo: null, dettaglio: null };
+      let lat, lng, comune = "", nome = "";
+      if (editPoint) {
+        state.rilievo.editId = editPoint.id;
+        lat = editPoint.lat; lng = editPoint.lng;
+        comune = editPoint.comune || "";
+        nome = editPoint.nome || "";
+        el.pfModalTitle.textContent = `Modifica PF #${editPoint.seq}`;
+        if (editPoint.photos) state.rilievo.photos = { ...editPoint.photos };
+      } else {
+        state.rilievo.editId = null;
+        lat = latlng.lat; lng = latlng.lng;
+        el.pfModalTitle.textContent = "Nuovo Punto Fiduciale";
+      }
+      resetPfPhotoUI();
+      state.rilievo.draft = { lat, lng, comune, foglio: "", particella: "" };
+      el.pfName.value = nome;
+      el.pfMetaCoords.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      el.pfMetaComune.textContent = comune || "…";
+      el.pfMetaFoglio.textContent = "…";
+      el.pfMetaParticella.textContent = "…";
+      el.pfModal.classList.add("show");
+
+      try {
+        const info = await reverseParcel({ lat, lng });
+        if (info) {
+          state.rilievo.draft.foglio = info.foglio !== "-" ? info.foglio : "";
+          state.rilievo.draft.particella = info.particella !== "-" ? info.particella : "";
+          if (!comune && info.comune && info.comune !== "-") state.rilievo.draft.comune = info.comune;
+          el.pfMetaComune.textContent = state.rilievo.draft.comune || "-";
+          el.pfMetaFoglio.textContent = info.foglio !== "-" ? info.foglio + (info.allegato || "") : "-";
+          el.pfMetaParticella.textContent = info.particella || "-";
+        } else {
+          el.pfMetaComune.textContent = comune || "-";
+          el.pfMetaFoglio.textContent = "-";
+          el.pfMetaParticella.textContent = "-";
+        }
+      } catch (e) {
+        el.pfMetaComune.textContent = comune || "-";
+        el.pfMetaFoglio.textContent = "-";
+        el.pfMetaParticella.textContent = "-";
+      }
+    }
+
+    function closePfModal() {
+      el.pfModal.classList.remove("show");
+      state.rilievo.editId = null;
+      state.rilievo.draft = null;
+    }
+
+    async function savePfPoint() {
+      const d = state.rilievo.draft;
+      if (!d) return;
+      const nameInput = el.pfName.value.trim();
+      const nome = nameInput || ((d.foglio || d.particella) ? `PF ${d.foglio || "?"}-${d.particella || "?"}` : "");
+      el.loader.classList.add("active");
+      try {
+        let saved;
+        if (state.rilievo.editId != null) {
+          const res = await fetch("/api/punti-rilievo", {
+            method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: state.rilievo.editId, nome })
+          });
+          saved = await res.json();
+          if (!res.ok) throw new Error(saved.error || "Errore salvataggio.");
+        } else {
+          const res = await fetch("/api/punti-rilievo", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ comune: d.comune, nome, lat: d.lat, lng: d.lng })
+          });
+          saved = await res.json();
+          if (!res.ok) throw new Error(saved.error || "Errore salvataggio.");
+        }
+        const photos = { ...state.rilievo.photos };
+        state.rilievo.points.set(saved.id, { ...saved, photos });
+        if (!map.hasLayer(rilievoLayer)) { prefs.rilievo.visible = true; el.toggleRilievo.checked = true; map.addLayer(rilievoLayer); savePrefs(); }
+        renderRilievo();
+        closePfModal();
+        toast(`Punto fiduciale salvato: ${rilievoDefaultName(saved)}.`);
+      } catch (err) {
+        console.error(err);
+        toast("Impossibile salvare il punto. " + (err.message || ""));
+      } finally {
+        el.loader.classList.remove("active");
+      }
+    }
+
+    async function deletePfPoint(p) {
+      if (!confirm(`Eliminare il punto "${rilievoDefaultName(p)}"?\nVerrà rimosso anche dal database. L'operazione non è reversibile.`)) return;
+      el.loader.classList.add("active");
+      try {
+        const res = await fetch(`/api/punti-rilievo?id=${encodeURIComponent(p.id)}`, { method: "DELETE" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Errore eliminazione.");
+        state.rilievo.points.delete(p.id);
+        map.closePopup();
+        renderRilievo();
+        toast("Punto eliminato.");
+      } catch (err) {
+        console.error(err);
+        toast("Impossibile eliminare il punto.");
+      } finally {
+        el.loader.classList.remove("active");
+      }
+    }
+
+    // ---- Generazione pacchetto ZIP ----
+
+    function canvasToBlob(canvas, type, quality) {
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob fallito")), type, quality);
+      });
+    }
+
+    function loadImageEl(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Immagine non caricata: " + url));
+        img.src = url;
+      });
+    }
+
+    function extFromFile(f) {
+      const t = (f.type || "").toLowerCase();
+      if (t.includes("png")) return ".png";
+      if (t.includes("webp")) return ".webp";
+      return ".jpg";
+    }
+
+    function triggerDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+    }
+
+    // Ortofoto satellitare ~1:1000, quadrata 1772×1772 (≈150 m a terra), tile Google via proxy.
+    const ORTHO_PX = 1772, ORTHO_GROUND_M = 150, ORTHO_ZOOM = 20;
+
+    function mercatorPixel(lat, lng, z) {
+      const scale = 256 * Math.pow(2, z);
+      const x = (lng + 180) / 360 * scale;
+      const s = Math.sin(lat * Math.PI / 180);
+      const y = (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * scale;
+      return { x, y };
+    }
+
+    async function buildOrthoBlob(lat, lng) {
+      const z = ORTHO_ZOOM;
+      const { x: cx, y: cy } = mercatorPixel(lat, lng, z);
+      const groundPerPx = (2 * Math.PI * 6378137 * Math.cos(lat * Math.PI / 180)) / (256 * Math.pow(2, z));
+      const halfPx = (ORTHO_GROUND_M / 2) / groundPerPx;
+      const minX = cx - halfPx, minY = cy - halfPx, maxX = cx + halfPx, maxY = cy + halfPx;
+      const tMinX = Math.floor(minX / 256), tMaxX = Math.floor(maxX / 256);
+      const tMinY = Math.floor(minY / 256), tMaxY = Math.floor(maxY / 256);
+      const originX = tMinX * 256, originY = tMinY * 256;
+      const src = document.createElement("canvas");
+      src.width = (tMaxX - tMinX + 1) * 256;
+      src.height = (tMaxY - tMinY + 1) * 256;
+      const sctx = src.getContext("2d");
+      const jobs = [];
+      for (let tx = tMinX; tx <= tMaxX; tx++) {
+        for (let ty = tMinY; ty <= tMaxY; ty++) {
+          const tileUrl = `https://mt${Math.abs(tx + ty) % 4}.google.com/vt/lyrs=s&x=${tx}&y=${ty}&z=${z}`;
+          const proxied = `/api/wms-proxy?url=${encodeURIComponent(tileUrl)}`;
+          const dx = tx * 256 - originX, dy = ty * 256 - originY;
+          jobs.push(loadImageEl(proxied).then(img => sctx.drawImage(img, dx, dy)).catch(() => {}));
+        }
+      }
+      await Promise.all(jobs);
+      const out = document.createElement("canvas");
+      out.width = ORTHO_PX; out.height = ORTHO_PX;
+      out.getContext("2d").drawImage(src, minX - originX, minY - originY, maxX - minX, maxY - minY, 0, 0, ORTHO_PX, ORTHO_PX);
+      return await canvasToBlob(out, "image/jpeg", 0.9);
+    }
+
+    // Mappa catastale ~1:2000, 945×709 (≈160×120 m), sfondo bianco, via WMS AdE.
+    const CAD_W = 945, CAD_H = 709, CAD_GROUND_W = 160, CAD_GROUND_H = 120;
+
+    function cadGetMapUrl(layer, sldBody, lat, lng) {
+      const latHalf = (CAD_GROUND_H / 2) / 111320;
+      const lngHalf = (CAD_GROUND_W / 2) / (111320 * Math.cos(lat * Math.PI / 180));
+      const bbox = [lng - lngHalf, lat - latHalf, lng + lngHalf, lat + latHalf].join(",");
+      const params = new URLSearchParams({
+        SERVICE: "WMS", VERSION: "1.1.1", REQUEST: "GetMap",
+        LAYERS: layer, STYLES: "", SRS: "EPSG:4258", BBOX: bbox,
+        WIDTH: String(CAD_W), HEIGHT: String(CAD_H),
+        FORMAT: "image/png", TRANSPARENT: "true", SLD_BODY: sldBody
+      });
+      return `/api/wms-proxy?url=${encodeURIComponent(WMS_URL)}&${params.toString()}`;
+    }
+
+    async function buildCadastreBlob(lat, lng) {
+      const out = document.createElement("canvas");
+      out.width = CAD_W; out.height = CAD_H;
+      const ctx = out.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, CAD_W, CAD_H);
+      const parcelSld = polygonSld("CP.CadastralParcel", "#000000", "#000000", "0", "1");
+      const buildSld = polygonSld("fabbricati", "#000000", "#999999", "1", "2");
+      try {
+        const pimg = await loadImageEl(cadGetMapUrl("CP.CadastralParcel", parcelSld, lat, lng));
+        ctx.drawImage(pimg, 0, 0, CAD_W, CAD_H);
+      } catch (e) { console.warn("Mappa particelle non disponibile", e); }
+      try {
+        const bimg = await loadImageEl(cadGetMapUrl("fabbricati", buildSld, lat, lng));
+        ctx.drawImage(bimg, 0, 0, CAD_W, CAD_H);
+      } catch (e) { console.warn("Mappa fabbricati non disponibile", e); }
+      return await canvasToBlob(out, "image/png");
+    }
+
+    function pfPackageName(p, latStr, lngStr) {
+      return `${p.comune || "NA"}PF_${p.seq} - ${latStr},${lngStr}`;
+    }
+
+    async function downloadPfPackage(p) {
+      if (typeof JSZip === "undefined") { toast("Libreria ZIP non caricata."); return; }
+      el.loader.classList.add("active");
+      toast("Genero il pacchetto del punto fiduciale...", 5000);
+      try {
+        const lat = p.lat, lng = p.lng;
+        const latStr = lat.toFixed(6), lngStr = lng.toFixed(6);
+        let info = null;
+        try { info = await reverseParcel({ lat, lng }); } catch (e) {}
+        const zip = new JSZip();
+        const dt = p.createdAt ? new Date(p.createdAt) : new Date();
+        const foglioTxt = info && info.foglio !== "-" ? info.foglio + (info.allegato || "") : "-";
+        const lines = [
+          "PUNTO FIDUCIALE - RILIEVO",
+          `Nome: ${rilievoDefaultName(p)}`,
+          `Comune (codice): ${p.comune || "-"}`,
+          `Foglio: ${foglioTxt}`,
+          `Particella: ${info && info.particella !== "-" ? info.particella : "-"}`,
+          `Latitudine: ${latStr}`,
+          `Longitudine: ${lngStr}`,
+          `Progressivo PF del comune: ${p.seq}`,
+          `Data e ora acquisizione: ${dt.toLocaleString("it-IT")}`
+        ];
+        zip.file("metadata.txt", lines.join("\r\n") + "\r\n");
+
+        const photos = p.photos || {};
+        if (photos.spigolo) zip.file("spigolo" + extFromFile(photos.spigolo), photos.spigolo);
+        if (photos.dettaglio) zip.file("dettaglio" + extFromFile(photos.dettaglio), photos.dettaglio);
+
+        try { zip.file("ortofoto_1000.jpg", await buildOrthoBlob(lat, lng)); }
+        catch (e) { console.warn("Ortofoto non generata", e); toast("Ortofoto non inclusa nel pacchetto."); }
+        try { zip.file("mappa_catastale_2000.png", await buildCadastreBlob(lat, lng)); }
+        catch (e) { console.warn("Mappa catastale non generata", e); }
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        triggerDownload(blob, pfPackageName(p, latStr, lngStr) + ".zip");
+        toast("Pacchetto scaricato.");
+      } catch (err) {
+        console.error(err);
+        toast("Errore nella generazione del pacchetto.");
+      } finally {
+        el.loader.classList.remove("active");
+      }
+    }
+
     const ISOIPSE_MIN_ZOOM = 13;
     const ISOIPSE_MAX_FEATURES = 600;
 
@@ -1239,6 +1801,9 @@
             if (typeof m.setStyle === "function") m.setStyle({ fillColor: p.color, fillOpacity: effOpacity("fiduciali") });
           });
           break;
+        case "rilievo":
+          renderRilievo();
+          break;
         case "isoipse":
           document.documentElement.style.setProperty("--iso-color", p.color);
           isoipseLayer.eachLayer(g => {
@@ -1267,7 +1832,7 @@
     }
 
     function applyGlobalOpacity() {
-      ["parcels", "buildings", "labels", "fiduciali", "isoipse"].forEach(applyLayerPrefs);
+      ["parcels", "buildings", "labels", "fiduciali", "rilievo", "isoipse"].forEach(applyLayerPrefs);
     }
 
     function applyVisibilityFromPrefs() {
@@ -1284,6 +1849,8 @@
       el.toggleLabels.checked = prefs.labels.visible;
       el.toggleFiduciali.checked = prefs.fiduciali.visible;
       if (prefs.fiduciali.visible) setFiduciariMode(true);
+      el.toggleRilievo.checked = prefs.rilievo.visible;
+      if (prefs.rilievo.visible) setRilievoMode(true);
       el.toggleIsoipse.checked = prefs.isoipse.visible;
       if (prefs.isoipse.visible) setIsoipseMode(true);
       document.documentElement.style.setProperty("--iso-color", prefs.isoipse.color);
@@ -1619,7 +2186,7 @@
     }
 
     async function identifyParcel(latlng) {
-      if (!state.identify || state.measuring) return;
+      if (!state.identify || state.measuring || state.rilievo.placing) return;
       if (map.getZoom() < 16) { toast("Il Catasto risponde solo a scale alte. Porta lo zoom almeno a 16."); return; }
       toast("Interrogo il Catasto...");
       const meters = Math.max(1.5, 22 - map.getZoom());
@@ -1794,6 +2361,30 @@
     });
     map.on("moveend zoomend", () => { if (state.fiduciali.visible) scheduleFiduciariReload(); });
     map.on("moveend zoomend", () => { if (state.isoipse.visible) scheduleIsoipseReload(); });
+    map.on("moveend zoomend", () => { if (prefs.rilievo.visible) scheduleRilievoReload(); });
+    map.on("move", () => { if (state.rilievo.placing) updatePfPlaceCoords(); });
+
+    el.toggleRilievo.addEventListener("change", e => {
+      setRilievoMode(e.target.checked);
+      savePrefs();
+    });
+    el.addPfBtn.addEventListener("click", () => { if (state.rilievo.placing) cancelPfPlacement(); else startPfPlacement(); });
+    el.pfPlaceOk.addEventListener("click", confirmPfPlacement);
+    el.pfPlaceCancel.addEventListener("click", cancelPfPlacement);
+    el.pfModalClose.addEventListener("click", closePfModal);
+    el.pfModal.addEventListener("click", e => { if (e.target === el.pfModal) closePfModal(); });
+    el.pfSave.addEventListener("click", savePfPoint);
+    el.pfPhotoSpigolo.addEventListener("change", e => { state.rilievo.photos.spigolo = e.target.files[0] || null; refreshPfPhotoUI(); });
+    el.pfPhotoDettaglio.addEventListener("change", e => { state.rilievo.photos.dettaglio = e.target.files[0] || null; refreshPfPhotoUI(); });
+    document.addEventListener("click", e => {
+      const btn = e.target.closest && e.target.closest(".pf-popup-btn");
+      if (!btn) return;
+      const p = state.rilievo.points.get(parseInt(btn.dataset.id, 10));
+      if (!p) return;
+      if (btn.dataset.act === "edit") openPfModal({ editPoint: p });
+      else if (btn.dataset.act === "zip") downloadPfPackage(p);
+      else if (btn.dataset.act === "del") deletePfPoint(p);
+    });
     el.openLayerSettings.addEventListener("click", openLayerSettings);
     el.layerSettingsClose.addEventListener("click", closeLayerSettings);
     el.layerSettingsModal.addEventListener("click", e => { if (e.target === el.layerSettingsModal) closeLayerSettings(); });

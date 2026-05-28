@@ -12,7 +12,7 @@ L'interfaccia è in stile HUD/cyberpunk (cyan neon, rosa, lime) con tutti i coma
 
 ### Mappa e livelli
 - **Sfondo** in mutua esclusione tra **Google Satellite** (default), **Bing Satellite**, **Ortofoto AGEA 2012** (Geoportale Nazionale) e **Nessuno** (sfondo trasparente): si sceglie con un selettore a quattro pulsanti.
-- **Livelli sovrapposti** (toggleable indipendentemente, tutti soggetti allo slider globale di opacità descritto sotto): **Particelle catasto**, **Fabbricati** (zoom 16+), **Numeri particella** (zoom 18+), **Punti Fiduciali** (zoom 14+), **Isoipse** (zoom 13+).
+- **Livelli sovrapposti** (toggleable indipendentemente, tutti soggetti allo slider globale di opacità descritto sotto): **Particelle catasto**, **Fabbricati** (zoom 16+), **Numeri particella** (zoom 18+), **Punti Fiduciali** (TAF, zoom 14+), **PF rilievo (miei)**, **Isoipse** (zoom 13+).
 - **Slider globale di opacità** sotto la lista livelli: regola l'opacità *effettiva* di tutti i livelli sovrapposti (non lo sfondo). Si combina moltiplicativamente con l'opacità per-livello impostata nel dialog di personalizzazione.
 - **Isoipse (curve di livello)**: fornite dal WFS del Geoportale Regione Lazio (`geonode:curve_livello`, salto di quota 5 m). Il GeoServer del Lazio rifiuta gli SLD inline (`Dynamic style usage is forbidden`) e non manda gli header CORS, quindi lo strato viene scaricato in vettoriale (GeoJSON via WFS 1.0.0, filtrato al bbox del viewport, max 600 feature) attraverso il proxy serverless `/api/wms-proxy`. Il valore di quota (`cv_liv_q`) è mostrato come tooltip permanente al punto medio di ogni curva e può essere acceso/spento da una checkbox nel dialog di personalizzazione.
 - **Punti Fiduciali (TAF)**: popup con `Codice PF`, descrizione, foglio/particella e due bottoni: **Naviga** (Google Maps) e **Monografia** (apre il PDF ufficiale dell'Agenzia delle Entrate in una nuova scheda — vedi nota sotto).
@@ -35,6 +35,25 @@ Il bottone "Monografia" del popup dei punti fiduciali non punta direttamente al 
 ### Interrogazione interattiva
 Tieni premuto sulla mappa (o tasto destro su desktop) sopra una particella: l'app interroga il WMS dell'Agenzia delle Entrate e mostra in un banner i dati di **Comune / Foglio / Particella**.
 
+### Aggiunta di Punti Fiduciali (i miei)
+Oltre ai Punti Fiduciali ufficiali (TAF, sola lettura) puoi **creare i tuoi PF** direttamente sul campo. Sono un dataset separato, salvato in una tabella DB dedicata, e sulla mappa appaiono con un **colore diverso** (rosa, pin con icona) rispetto ai TAF.
+
+1. Premi il bottone **Aggiungi PF** (in alto nella colonna di bottoni in basso a destra). Compare un **mirino fisso al centro** (stile Google Earth): sposti la mappa sotto il mirino con il dito/mouse — più zoomi, più aumenti la precisione.
+2. Quando il mirino è sul punto, premi **OK** sulla barra in basso.
+3. Si apre una modale: in alto vedi **coordinate** e (se lo zoom lo permette) **comune / foglio / particella** ricavati interrogando il catasto. Puoi dare un **nome** al punto (se lo lasci vuoto ne viene generato uno automatico dal foglio-particella, con prefisso `PF`). Due bottoni permettono di allegare la **foto dello spigolo** e la **foto del dettaglio** (sul cellulare puoi scegliere fotocamera o galleria).
+4. **Salva**: il punto viene registrato sul DB (posizione, nome, comune, progressivo, data/ora). Le foto **non** vanno sul DB, restano in memoria nella sessione corrente.
+
+Cliccando un punto già salvato si apre un mini-popup con tre azioni:
+- **Modifica** — riapre la modale per cambiare nome/foto;
+- **Scarica** — genera al volo un **pacchetto ZIP** (vedi sotto);
+- **Elimina** — rimuove il punto anche dal DB, previa conferma.
+
+Il pacchetto ZIP si chiama `{codice comune}PF_{progressivo} - {lat},{lng}.zip` (il progressivo conta solo i punti aggiunti da noi per quel comune) e contiene:
+- `metadata.txt` — nome, comune, foglio, particella, coordinate, progressivo, data/ora;
+- le **foto** scattate, se presenti nella sessione;
+- `ortofoto_1000.jpg` — ritaglio di ortofoto satellitare centrato sul punto, quadrato 1772×1772 px (≈ scala 1:1000, ~150 m di lato);
+- `mappa_catastale_2000.png` — estratto catastale 945×709 px (≈ scala 1:2000, ~160×120 m) su **sfondo bianco**, con particelle dal bordo nero sottile e senza riempimento, e fabbricati con riempimento grigio `#999999` e bordo nero di spessore doppio.
+
 ### Import dei rilievi
 Carica uno o più file **KML** o **GeoJSON**: vengono aggiunti come livelli indipendenti, attivabili/disattivabili singolarmente. I KML con più cartelle (`<Folder>`) vengono splittati automaticamente in un livello per cartella. Ogni punto del rilievo ha un popup con il link a Google Maps per la navigazione.
 
@@ -54,15 +73,17 @@ index.html                      # Tutta l'app frontend (vanilla JS + Leaflet)
 sw.js                           # service worker: serve i tile dalla Cache quando si è offline
 api/cerca-particella.js         # serverless: centroide di una particella (PostGIS)
 api/cerca-comune.js             # serverless: centroide complessivo di un comune
-api/punti-fiduciali.js          # serverless: punti fiduciali per bbox/comune
+api/punti-fiduciali.js          # serverless: punti fiduciali ufficiali (TAF) per bbox/comune
+api/punti-rilievo.js            # serverless: CRUD dei PF aggiunti da noi (GET bbox / POST / PUT / DELETE)
 api/monografia.js               # serverless: risolve l'URL PDF AdE via scraping
-api/wms-proxy.js                # serverless: proxy CORS per il WMS catastale
+api/wms-proxy.js                # serverless: proxy CORS per WMS/WFS, tile AGEA e tile Google (ortofoto ZIP)
 scripts/import-fiduciali.mjs    # importer one-shot del GeoJSON TAF nel DB
+scripts/create-punti-rilievo.sql # DDL one-shot della tabella punti_rilievo (da lanciare in Neon)
 package.json
 ```
 
 ### Stack
-- **Frontend**: HTML/CSS/JS senza framework, [Leaflet 1.9.4](https://leafletjs.com/), [leaflet-omnivore](https://github.com/mapbox/leaflet-omnivore) per il parsing KML, Material Symbols per le icone. Nessuna build step.
+- **Frontend**: HTML/CSS/JS senza framework, [Leaflet 1.9.4](https://leafletjs.com/), [leaflet-omnivore](https://github.com/mapbox/leaflet-omnivore) per il parsing KML, [JSZip 3.10.1](https://stuk.github.io/jszip/) per il pacchetto PF, Material Symbols per le icone. Nessuna build step.
 - **Backend**: due funzioni serverless Node.js su **Vercel**.
 - **Database**: PostgreSQL + **PostGIS** su [Neon](https://neon.tech/), tabella `particelle_catastali` con le geometrie dei lotti.
 
@@ -72,9 +93,9 @@ package.json
 | WMS Agenzia delle Entrate (`wms.cartografia.agenziaentrate.gov.it`) | Particelle, fabbricati, numeri |
 | WMS Geoportale Nazionale (`wms.pcn.minambiente.it`) | Ortofoto AGEA 2012 |
 | WMS Geoportale Regione Lazio (`geoportale.regione.lazio.it`) | Isoipse (curve di livello a 5 m) |
-| Google Satellite tiles | Sfondo satellitare principale |
+| Google Satellite tiles | Sfondo satellitare principale + ortofoto del pacchetto PF (via proxy) |
 | Bing/Virtual Earth tiles | Sfondo satellitare alternativo |
-| Neon Postgres + PostGIS | Ricerca particella, ricerca comune, punti fiduciali |
+| Neon Postgres + PostGIS | Ricerca particella, ricerca comune, punti fiduciali (ufficiali e nostri) |
 | Portale Monografie AdE (`www1.agenziaentrate.gov.it/servizi/Monografie/`) | Scraping HTML per risolvere l'URL del PDF della monografia di un PF |
 
 ---
@@ -201,6 +222,28 @@ node scripts/import-fiduciali.mjs "C:\path\TAF_Punti_Fiduciali.geojson"
 Lo script tronca la tabella e reinserisce in batch da 500. Salva **solo il `namefile`** (parte variabile dell'URL AdE), non l'URL intero: vedi più sotto perché.
 
 > **Perché non salvare l'URL completo.** Nel GeoJSON ufficiale del TAF il campo `Download` è un URL del tipo `download.php?key=NNN&fs=15&dir=NNN&namefile=…`. La `key` è generata dal portale AdE per ogni sessione di ricerca: il file salvato ha la key valida solo al momento della generazione, dopo poco tempo il server la ignora e serve un PDF di fallback. L'URL viene quindi **ricostruito al volo dal backend** (`/api/monografia`) facendo scraping di `risultato.php`, che è pubblico e accetta `GET` senza cookies.
+
+### Tabella dei Punti Fiduciali aggiunti dall'app
+
+I PF creati dall'utente (vedi *Aggiunta di Punti Fiduciali*) stanno in una tabella **separata** da `punti_fiduciali`. Va creata una volta prima del deploy lanciando `scripts/create-punti-rilievo.sql` nella console Neon:
+
+```sql
+CREATE TABLE IF NOT EXISTS punti_rilievo (
+  id          SERIAL PRIMARY KEY,
+  comune      text,                    -- codice Belfiore, per il progressivo per-comune
+  seq         integer NOT NULL,        -- progressivo del PF di quel comune (solo punti nostri)
+  nome        text,
+  lat         double precision NOT NULL,
+  lng         double precision NOT NULL,
+  geom        geography(Point, 4326),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS punti_rilievo_geom_idx   ON punti_rilievo USING GIST (geom);
+CREATE INDEX IF NOT EXISTS punti_rilievo_comune_idx ON punti_rilievo (comune);
+```
+
+Il `seq` viene assegnato dal backend all'inserimento (`MAX(seq)+1` per quel comune) e resta stabile, così il nome del pacchetto ZIP non cambia. Le foto **non** sono salvate sul DB.
 
 ---
 
