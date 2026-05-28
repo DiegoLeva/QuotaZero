@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -L -A \"Mozilla/5.0\" -b /tmp/ade_cookies.txt -c /tmp/ade_cookies.txt -X POST \"https://www1.agenziaentrate.gov.it/servizi/Monografie/ricerca.php?level=2&prov=FR\" -d \"co=A032\")"
+    ]
+  }
+}

@@ -565,7 +565,6 @@
   <script>
     const WMS_URL = "https://wms.cartografia.agenziaentrate.gov.it/inspire/wms/ows01.php";
     const PCN_AGEA_URL = "https://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_12.map";
-    const MONOGRAFIA_BASE = "https://www1.agenziaentrate.gov.it/servizi/Monografie/download.php?key=7000001747634&fs=15&dir=1229&namefile=";
     const CATASTO_CRS = L.extend({}, L.CRS.EPSG4326, { code: "EPSG:4258" });
     const CATASTO_TILE_SIZE = 512;
     const STORAGE_KEY = "georilievo_pro_state_v3";
@@ -762,8 +761,8 @@
       const meta = `<div class="row-sub">Foglio: ${foglioTxt}<br>Particella: ${particellaTxt}</div>`;
       const navHref = `https://maps.google.com/?q=${p.lat},${p.lng}`;
       let pdfBtn = "";
-      if (p.namefile) {
-        const pdfHref = MONOGRAFIA_BASE + encodeURIComponent(p.namefile);
+      if (p.namefile && p.comune && p.foglio) {
+        const pdfHref = `/api/monografia?co=${encodeURIComponent(p.comune)}&foglio=${encodeURIComponent(p.foglio)}&namefile=${encodeURIComponent(p.namefile)}`;
         pdfBtn = `<a class="btn warn" href="${pdfHref}" target="_blank" rel="noopener"><span class="icon">picture_as_pdf</span> Monografia</a>`;
       }
       return `
