@@ -1301,8 +1301,8 @@
     setIdentifyMode(true);
 
     const GANDALF_CENTER = L.latLng(41.50044582554866, 13.557234185276197);
-    const GANDALF_HALF_LAT = 0.000018;
-    const GANDALF_HALF_LNG = 0.000024;
+    const GANDALF_HALF_LAT = 0.0000072;
+    const GANDALF_HALF_LNG = 0.0000096;
     const GANDALF_BOUNDS = L.latLngBounds(
       [GANDALF_CENTER.lat - GANDALF_HALF_LAT, GANDALF_CENTER.lng - GANDALF_HALF_LNG],
       [GANDALF_CENTER.lat + GANDALF_HALF_LAT, GANDALF_CENTER.lng + GANDALF_HALF_LNG]
@@ -1313,7 +1313,7 @@
       className: "gandalf-overlay",
       alt: ""
     });
-    const GANDALF_MIN_ZOOM = 20;
+    const GANDALF_MIN_ZOOM = 10;
     let gandalfBubbleTimer = null;
     let gandalfBubble = null;
 
