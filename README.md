@@ -51,12 +51,18 @@ Cliccando un punto già salvato si apre un mini-popup con tre azioni:
 Se non si inserisce un nome, la casella viene pre-compilata con un nome automatico `PF foglio-particella`.
 
 Il pacchetto ZIP si chiama `{codice comune}PF_{progressivo} - {lat},{lng}.zip` (il progressivo conta solo i punti aggiunti da noi per quel comune) e contiene:
-- `metadata.txt` — nome, comune, foglio, particella, coordinate, progressivo, data/ora;
+- `metadata.txt` — nome, comune, foglio, particella, coordinate, progressivo, data/ora, più le **coordinate calcolate**: geografiche (ETRF2000/WGS84) e UTM-ETRF2000 (fuso, Est, Nord). Gauss-Boaga, Cassini-Soldner, cartesiane geocentriche e le quote non sono calcolabili dalla sola posizione (richiedono trasformazione di datum o la quota ellissoidica) e quindi vengono omesse;
 - le **foto** scattate, se presenti nella sessione;
 - `ortofoto_1000.jpg` — ritaglio di ortofoto satellitare centrato sul punto, quadrato 1772×1772 px (≈ scala 1:1000, ~150 m di lato);
-- `mappa_catastale_2000.png` — estratto catastale 945×709 px (≈ scala 1:2000, ~160×120 m) su **sfondo bianco**, con particelle dal bordo nero sottile e senza riempimento, e fabbricati con riempimento grigio `#999999` e bordo nero di spessore doppio.
+- `mappa_catastale_2000.png` — estratto catastale 945×709 px (≈ scala 1:2000, ~160×120 m) su **sfondo bianco**, con particelle dal bordo nero sottile e senza riempimento, fabbricati con riempimento grigio `#999999` e bordo nero di spessore doppio, e i **numeri di particella in nero**.
 
-In entrambe le immagini il punto fiduciale è disegnato al centro con un simbolo a mirino.
+Le immagini mostrano l'area centrata sul punto, senza alcun marker sovrapposto.
+
+### Gestione PF
+In fondo al menu di sinistra la sezione **Gestione PF** permette di gestire in blocco i Punti Fiduciali aggiunti in campo:
+- **Scarica GeoJSON** — esporta tutti i PF in un file GeoJSON (`punti_fiduciali_AAAA-MM-GG.geojson`) con nome, comune, progressivo e data. Le foto **non** sono incluse;
+- **Carica GeoJSON** — importa i punti da un file GeoJSON: ogni feature `Point` viene salvata come nuovo PF (il progressivo per comune viene riassegnato dal server);
+- **Elimina tutti i PF** — rimuove dal DB tutti i punti aggiunti, previa conferma.
 
 ### Import dei rilievi
 Carica uno o più file **KML** o **GeoJSON**: vengono aggiunti come livelli indipendenti, attivabili/disattivabili singolarmente. I KML con più cartelle (`<Folder>`) vengono splittati automaticamente in un livello per cartella. Ogni punto del rilievo ha un popup con il link a Google Maps per la navigazione.

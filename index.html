@@ -723,6 +723,21 @@
         <div id="offlineInfo" class="hint"></div>
       </section>
 
+      <section class="section">
+        <div class="section-title">Gestione PF</div>
+        <div class="btn-grid">
+          <button class="btn blue" id="exportRilievo"><span class="icon">file_download</span> Scarica GeoJSON</button>
+          <label class="btn primary">
+            <span class="icon">file_upload</span> Carica GeoJSON
+            <input class="file-input" id="importRilievo" type="file" accept=".geojson,.json">
+          </label>
+        </div>
+        <button class="btn warn full" id="deleteAllRilievo" style="margin-top:8px">
+          <span class="icon">delete_forever</span> Elimina tutti i PF
+        </button>
+        <p class="hint">Esporta, importa o elimina tutti i Punti Fiduciali aggiunti in campo. Le foto non sono incluse nel GeoJSON.</p>
+      </section>
+
     </div>
   </aside>
 
@@ -966,6 +981,9 @@
       loadOffline: document.getElementById("loadOffline"),
       clearOffline: document.getElementById("clearOffline"),
       offlineInfo: document.getElementById("offlineInfo"),
+      exportRilievo: document.getElementById("exportRilievo"),
+      importRilievo: document.getElementById("importRilievo"),
+      deleteAllRilievo: document.getElementById("deleteAllRilievo"),
       identifyBanner: document.getElementById("identifyBanner"),
       idComune: document.getElementById("idComune"),
       idFoglio: document.getElementById("idFoglio"),
@@ -1022,6 +1040,9 @@
     ].forEach(([name, zIndex]) => {
       map.createPane(name);
       map.getPane(name).style.zIndex = zIndex;
+    });
+    ["ageaPane", "bingPane", "googlePane", "parcelPane", "buildingPane", "labelPane"].forEach(name => {
+      map.getPane(name).style.pointerEvents = "none";
     });
 
     const BingSatellite = L.TileLayer.extend({
@@ -1124,10 +1145,10 @@
       if (active) toast("Misura attiva. Tocca la mappa per aggiungere punti.");
     }
 
-    function setIdentifyMode(active) {
+    function setIdentifyMode(active, silent) {
       state.identify = active;
       el.identifyBtn.classList.toggle("active", active);
-      if (active) toast("Interrogazione catasto attiva: tieni premuto su una particella.");
+      if (active && !silent) toast("Interrogazione catasto attiva: tieni premuto su una particella.");
     }
 
     function buildFiduciariPopup(p) {
@@ -1159,9 +1180,9 @@
         if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
         const marker = L.circleMarker([p.lat, p.lng], {
           pane: "fiduciariPane",
-          radius: 5,
+          radius: 9,
           color: "#001015",
-          weight: 1.5,
+          weight: 2,
           fillColor: color,
           fillOpacity: opacity
         });
@@ -1237,9 +1258,9 @@
         if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
         const marker = L.circleMarker([p.lat, p.lng], {
           pane: "rilievoPane",
-          radius: 5,
+          radius: 9,
           color: "#001015",
-          weight: 1.5,
+          weight: 2,
           fillColor: color,
           fillOpacity: eff
         });
@@ -1566,6 +1587,107 @@
       }
     }
 
+    // ---- Gestione PF: esporta / importa / elimina tutti ----
+
+    async function fetchAllRilievo() {
+      const res = await fetch("/api/punti-rilievo");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Errore caricamento punti.");
+      return data.punti || [];
+    }
+
+    async function exportRilievoGeojson() {
+      el.loader.classList.add("active");
+      try {
+        const punti = await fetchAllRilievo();
+        if (!punti.length) { toast("Nessun PF da esportare."); return; }
+        const fc = {
+          type: "FeatureCollection",
+          features: punti.map(p => ({
+            type: "Feature",
+            properties: {
+              id: p.id, comune: p.comune, seq: p.seq,
+              nome: rilievoDefaultName(p), createdAt: p.createdAt || null
+            },
+            geometry: { type: "Point", coordinates: [p.lng, p.lat] }
+          }))
+        };
+        const blob = new Blob([JSON.stringify(fc, null, 2)], { type: "application/geo+json" });
+        const stamp = new Date().toISOString().slice(0, 10);
+        triggerDownload(blob, `punti_fiduciali_${stamp}.geojson`);
+        toast(`Esportati ${punti.length} PF.`);
+      } catch (err) {
+        console.error(err);
+        toast("Impossibile esportare i PF. " + (err.message || ""));
+      } finally {
+        el.loader.classList.remove("active");
+      }
+    }
+
+    async function importRilievoGeojson(file) {
+      el.loader.classList.add("active");
+      toast("Importo i punti fiduciali...", 4000);
+      try {
+        const fc = JSON.parse(await file.text());
+        const feats = Array.isArray(fc.features) ? fc.features : (fc.type === "Feature" ? [fc] : []);
+        let ok = 0, skip = 0;
+        for (const f of feats) {
+          const g = f.geometry;
+          if (!g || g.type !== "Point" || !Array.isArray(g.coordinates)) { skip++; continue; }
+          const [lng, lat] = g.coordinates;
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) { skip++; continue; }
+          const props = f.properties || {};
+          const body = { comune: (props.comune || "").trim(), nome: (props.nome || "").trim(), lat, lng };
+          try {
+            const res = await fetch("/api/punti-rilievo", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body)
+            });
+            const saved = await res.json();
+            if (!res.ok) throw new Error(saved.error || "Errore");
+            state.rilievo.points.set(saved.id, { ...saved, photos: { spigolo: null, dettaglio: null } });
+            ok++;
+          } catch (e) { console.warn("PF non importato", e); skip++; }
+        }
+        if (ok && !map.hasLayer(rilievoLayer)) { prefs.rilievo.visible = true; el.toggleRilievo.checked = true; map.addLayer(rilievoLayer); savePrefs(); }
+        renderRilievo();
+        toast(`Importati ${ok} PF${skip ? `, ${skip} ignorati` : ""}.`);
+      } catch (err) {
+        console.error(err);
+        toast("File GeoJSON non valido o non leggibile.");
+      } finally {
+        el.loader.classList.remove("active");
+      }
+    }
+
+    async function deleteAllRilievo() {
+      el.loader.classList.add("active");
+      let punti;
+      try { punti = await fetchAllRilievo(); }
+      catch (err) { el.loader.classList.remove("active"); toast("Impossibile leggere i PF."); return; }
+      if (!punti.length) { el.loader.classList.remove("active"); toast("Nessun PF da eliminare."); return; }
+      if (!confirm(`Eliminare TUTTI i ${punti.length} Punti Fiduciali aggiunti?\nVerranno rimossi dal database. L'operazione non è reversibile.`)) {
+        el.loader.classList.remove("active");
+        return;
+      }
+      try {
+        let removed = 0;
+        for (const p of punti) {
+          try {
+            const res = await fetch(`/api/punti-rilievo?id=${encodeURIComponent(p.id)}`, { method: "DELETE" });
+            if (!res.ok) throw new Error();
+            state.rilievo.points.delete(p.id);
+            removed++;
+          } catch (e) { console.warn("PF non eliminato", p.id, e); }
+        }
+        map.closePopup();
+        renderRilievo();
+        toast(`Eliminati ${removed} PF.`);
+      } finally {
+        el.loader.classList.remove("active");
+      }
+    }
+
     // ---- Generazione pacchetto ZIP ----
 
     function canvasToBlob(canvas, type, quality) {
@@ -1583,32 +1705,31 @@
       });
     }
 
-    // Simbolo del punto fiduciale (mirino + cerchio) al centro delle immagini generate.
-    function drawCenterMarker(ctx, cx, cy, r) {
-      const cross = r * 1.7;
-      ctx.save();
-      ctx.lineCap = "round";
-      ctx.strokeStyle = "rgba(255,255,255,0.95)";
-      ctx.lineWidth = r * 0.55;
-      ctx.beginPath();
-      ctx.moveTo(cx - cross, cy); ctx.lineTo(cx + cross, cy);
-      ctx.moveTo(cx, cy - cross); ctx.lineTo(cx, cy + cross);
-      ctx.stroke();
-      ctx.strokeStyle = "#ff2d6f";
-      ctx.lineWidth = r * 0.3;
-      ctx.beginPath();
-      ctx.moveTo(cx - cross, cy); ctx.lineTo(cx + cross, cy);
-      ctx.moveTo(cx, cy - cross); ctx.lineTo(cx, cy + cross);
-      ctx.stroke();
-      ctx.lineWidth = r * 0.34;
-      ctx.strokeStyle = "rgba(255,255,255,0.95)";
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-      ctx.lineWidth = r * 0.2;
-      ctx.strokeStyle = "#ff2d6f";
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = "#ff2d6f";
-      ctx.beginPath(); ctx.arc(cx, cy, r * 0.22, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
+    // Conversione geografiche WGS84/ETRF2000 -> UTM (serie di Snyder, ellissoide WGS84).
+    // ETRF2000 coincide con WGS84 a livello centimetrico, quindi le coordinate UTM sono affidabili.
+    // Gauss-Boaga, Cassini-Soldner e le coordinate cartesiane geocentriche richiedono una
+    // trasformazione di datum (Roma40) o la quota ellissoidica e non sono calcolabili da lat/lng: omesse.
+    function toUtmEtrf2000(lat, lng) {
+      const a = 6378137.0, f = 1 / 298.257223563, k0 = 0.9996;
+      const e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+      const zone = Math.floor((lng + 180) / 6) + 1;
+      const lon0 = (zone * 6 - 183) * Math.PI / 180;
+      const phi = lat * Math.PI / 180, lam = lng * Math.PI / 180;
+      const N = a / Math.sqrt(1 - e2 * Math.sin(phi) ** 2);
+      const T = Math.tan(phi) ** 2;
+      const C = ep2 * Math.cos(phi) ** 2;
+      const A = Math.cos(phi) * (lam - lon0);
+      const M = a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 ** 3 / 256) * phi
+        - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 ** 3 / 1024) * Math.sin(2 * phi)
+        + (15 * e2 * e2 / 256 + 45 * e2 ** 3 / 1024) * Math.sin(4 * phi)
+        - (35 * e2 ** 3 / 3072) * Math.sin(6 * phi));
+      const easting = k0 * N * (A + (1 - T + C) * A ** 3 / 6
+        + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A ** 5 / 120) + 500000;
+      let northing = k0 * (M + N * Math.tan(phi) * (A * A / 2
+        + (5 - T + 9 * C + 4 * C * C) * A ** 4 / 24
+        + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A ** 6 / 720));
+      if (lat < 0) northing += 10000000;
+      return { zone, easting, northing };
     }
 
     function extFromFile(f) {
@@ -1666,7 +1787,6 @@
       out.width = ORTHO_PX; out.height = ORTHO_PX;
       const octx = out.getContext("2d");
       octx.drawImage(src, minX - originX, minY - originY, maxX - minX, maxY - minY, 0, 0, ORTHO_PX, ORTHO_PX);
-      drawCenterMarker(octx, ORTHO_PX / 2, ORTHO_PX / 2, 30);
       return await canvasToBlob(out, "image/jpeg", 0.9);
     }
 
@@ -1702,7 +1822,10 @@
         const bimg = await loadImageEl(cadGetMapUrl("fabbricati", buildSld, lat, lng));
         ctx.drawImage(bimg, 0, 0, CAD_W, CAD_H);
       } catch (e) { console.warn("Mappa fabbricati non disponibile", e); }
-      drawCenterMarker(ctx, CAD_W / 2, CAD_H / 2, 16);
+      try {
+        const limg = await loadImageEl(cadGetMapUrl("codice_plla", labelSld("#000000"), lat, lng));
+        ctx.drawImage(limg, 0, 0, CAD_W, CAD_H);
+      } catch (e) { console.warn("Numeri particella non disponibili", e); }
       return await canvasToBlob(out, "image/png");
     }
 
@@ -1733,6 +1856,18 @@
           `Progressivo PF del comune: ${p.seq}`,
           `Data e ora acquisizione: ${dt.toLocaleString("it-IT")}`
         ];
+        const utm = toUtmEtrf2000(lat, lng);
+        lines.push(
+          "",
+          "--- COORDINATE CALCOLATE ---",
+          "Geografiche (ETRF2000/WGS84):",
+          `  LAT: ${lat.toFixed(6)}`,
+          `  LON: ${lng.toFixed(6)}`,
+          "UTM-ETRF2000:",
+          `  Fuso: ${utm.zone}N`,
+          `  Est: ${utm.easting.toFixed(3)}`,
+          `  Nord: ${utm.northing.toFixed(3)}`
+        );
         zip.file("metadata.txt", lines.join("\r\n") + "\r\n");
 
         const photos = p.photos || {};
@@ -2499,6 +2634,14 @@
     });
     el.clearOffline.addEventListener("click", clearOfflineData);
 
+    el.exportRilievo.addEventListener("click", exportRilievoGeojson);
+    el.importRilievo.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (file) importRilievoGeojson(file);
+      e.target.value = "";
+    });
+    el.deleteAllRilievo.addEventListener("click", deleteAllRilievo);
+
     map.on("click", e => { if (state.measuring) { state.measurePoints.push(e.latlng); refreshMeasure(); } });
     map.on("contextmenu", e => identifyParcel(e.latlng));
     map.on("mousedown touchstart", e => {
@@ -2683,7 +2826,7 @@
       if (resolveComune(el.comuneSearchInput.value)) goToComune(el.comuneSearchInput.value);
     });
 
-    setIdentifyMode(true);
+    setIdentifyMode(true, true);
 
     const GANDALF_CENTER = L.latLng(41.50044582554866, 13.557234185276197);
     const GANDALF_HALF_LAT = 0.00000864;
