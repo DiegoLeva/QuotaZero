@@ -178,7 +178,7 @@
       background: linear-gradient(90deg, rgba(0,245,255,.16), rgba(5,10,18,.92) 42%, rgba(255,45,111,.14)), var(--panel);
       box-shadow: var(--shadow); backdrop-filter: blur(18px); white-space: nowrap;
     }
-    .status-pill strong { font-size: 13px; font-weight: 900; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; user-select: none; -webkit-user-select: none; transition: color .2s ease, text-shadow .2s ease; }
+    .status-pill strong { font-size: 13px; font-weight: 900; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; user-select: none; -webkit-user-select: none; touch-action: manipulation; transition: color .2s ease, text-shadow .2s ease; }
     .status-pill strong.eggs-on { color: var(--danger); text-shadow: 0 0 10px var(--danger); }
 
     .drawer {
@@ -2706,12 +2706,24 @@
     el.deleteAllRilievo.addEventListener("click", deleteAllRilievo);
 
     el.brandTitle.classList.toggle("eggs-on", eggsEnabled);
-    el.brandTitle.addEventListener("dblclick", () => {
+    function toggleEggs() {
       eggsEnabled = !eggsEnabled;
       localStorage.setItem(EGGS_KEY, eggsEnabled ? "1" : "0");
       el.brandTitle.classList.toggle("eggs-on", eggsEnabled);
       updateGandalf();
       if (state.userLatLng) setUserMarker(state.userLatLng);
+    }
+    // Doppio tap rilevato a mano (funziona su mobile dove dblclick è inaffidabile e zooma).
+    let brandTapCount = 0, brandTapTimer = null;
+    el.brandTitle.addEventListener("click", () => {
+      brandTapCount++;
+      if (brandTapCount >= 2) {
+        clearTimeout(brandTapTimer);
+        brandTapCount = 0;
+        toggleEggs();
+      } else {
+        brandTapTimer = setTimeout(() => { brandTapCount = 0; }, 500);
+      }
     });
 
     map.on("click", e => { if (state.measuring) { state.measurePoints.push(e.latlng); refreshMeasure(); } });
