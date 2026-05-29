@@ -61,7 +61,7 @@ Le immagini mostrano l'area centrata sul punto, senza alcun marker sovrapposto.
 ### Gestione PF
 In fondo al menu di sinistra la sezione **Gestione PF** permette di gestire in blocco i Punti Fiduciali aggiunti in campo:
 - **Scarica GeoJSON** — esporta tutti i PF in un file GeoJSON (`punti_fiduciali_AAAA-MM-GG.geojson`) con nome, comune, progressivo e data. Le foto **non** sono incluse;
-- **Carica GeoJSON** — importa i punti da un file GeoJSON: ogni feature `Point` viene salvata come nuovo PF (il progressivo per comune viene riassegnato dal server);
+- **Carica GeoJSON** — importa i punti da un file GeoJSON. Se un punto importato cade entro ~2 m da un PF già presente, **aggiorna** quello esistente (nome e posizione) invece di crearne uno nuovo: così, ri-caricando un proprio export, non si generano duplicati. I punti realmente nuovi vengono inseriti e il progressivo per comune viene assegnato dal server;
 - **Elimina tutti i PF** — rimuove dal DB tutti i punti aggiunti, previa conferma.
 
 ### Import dei rilievi

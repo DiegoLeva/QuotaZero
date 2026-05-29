@@ -1624,34 +1624,69 @@
       }
     }
 
+    // Due PF entro questo raggio (m) sono considerati lo stesso punto: in import si aggiorna invece di duplicare.
+    const RILIEVO_DEDUP_M = 2;
+
+    function metersBetween(lat1, lng1, lat2, lng2) {
+      const dLat = (lat2 - lat1) * 111320;
+      const dLng = (lng2 - lng1) * 111320 * Math.cos((lat1 + lat2) / 2 * Math.PI / 180);
+      return Math.hypot(dLat, dLng);
+    }
+
     async function importRilievoGeojson(file) {
       el.loader.classList.add("active");
       toast("Importo i punti fiduciali...", 4000);
       try {
         const fc = JSON.parse(await file.text());
         const feats = Array.isArray(fc.features) ? fc.features : (fc.type === "Feature" ? [fc] : []);
-        let ok = 0, skip = 0;
+        let existing = [];
+        try { existing = await fetchAllRilievo(); } catch (e) { console.warn("PF esistenti non letti", e); }
+        const usedIds = new Set();
+        let added = 0, updated = 0, skip = 0;
         for (const f of feats) {
           const g = f.geometry;
           if (!g || g.type !== "Point" || !Array.isArray(g.coordinates)) { skip++; continue; }
           const [lng, lat] = g.coordinates;
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) { skip++; continue; }
           const props = f.properties || {};
-          const body = { comune: (props.comune || "").trim(), nome: (props.nome || "").trim(), lat, lng };
+          const nome = (props.nome || "").trim();
+          const comune = (props.comune || "").trim();
+          let match = null, best = RILIEVO_DEDUP_M;
+          for (const e of existing) {
+            if (usedIds.has(e.id)) continue;
+            const d = metersBetween(lat, lng, e.lat, e.lng);
+            if (d <= best) { best = d; match = e; }
+          }
           try {
-            const res = await fetch("/api/punti-rilievo", {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(body)
-            });
-            const saved = await res.json();
-            if (!res.ok) throw new Error(saved.error || "Errore");
-            state.rilievo.points.set(saved.id, { ...saved, photos: { spigolo: null, dettaglio: null } });
-            ok++;
+            if (match) {
+              const res = await fetch("/api/punti-rilievo", {
+                method: "PUT", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: match.id, nome: nome || rilievoDefaultName(match), lat, lng })
+              });
+              const saved = await res.json();
+              if (!res.ok) throw new Error(saved.error || "Errore");
+              usedIds.add(match.id);
+              state.rilievo.points.set(saved.id, { ...saved, photos: { spigolo: null, dettaglio: null } });
+              updated++;
+            } else {
+              const res = await fetch("/api/punti-rilievo", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ comune, nome, lat, lng })
+              });
+              const saved = await res.json();
+              if (!res.ok) throw new Error(saved.error || "Errore");
+              usedIds.add(saved.id);
+              existing.push(saved);
+              state.rilievo.points.set(saved.id, { ...saved, photos: { spigolo: null, dettaglio: null } });
+              added++;
+            }
           } catch (e) { console.warn("PF non importato", e); skip++; }
         }
-        if (ok && !map.hasLayer(rilievoLayer)) { prefs.rilievo.visible = true; el.toggleRilievo.checked = true; map.addLayer(rilievoLayer); savePrefs(); }
+        if ((added || updated) && !map.hasLayer(rilievoLayer)) { prefs.rilievo.visible = true; el.toggleRilievo.checked = true; map.addLayer(rilievoLayer); savePrefs(); }
         renderRilievo();
-        toast(`Importati ${ok} PF${skip ? `, ${skip} ignorati` : ""}.`);
+        const parts = [`${added} nuovi`, `${updated} aggiornati`];
+        if (skip) parts.push(`${skip} ignorati`);
+        toast(`Import PF: ${parts.join(", ")}.`);
       } catch (err) {
         console.error(err);
         toast("File GeoJSON non valido o non leggibile.");
