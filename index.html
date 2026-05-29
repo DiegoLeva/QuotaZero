@@ -450,6 +450,23 @@
     @keyframes hud-spin {
       to { transform: rotate(360deg); }
     }
+    .gps-marker { pointer-events: none; }
+    .gps-marker .gps-dot {
+      position: absolute; left: 50%; top: 50%; width: 16px; height: 16px;
+      transform: translate(-50%, -50%); border-radius: 50%;
+      background: #26d3a6; border: 3px solid #fff;
+      box-shadow: 0 0 10px #26d3a6, 0 0 3px rgba(0, 0, 0, 0.7);
+    }
+    .gps-marker .gps-pulse {
+      position: absolute; left: 50%; top: 50%; width: 16px; height: 16px;
+      transform: translate(-50%, -50%); border-radius: 50%;
+      background: rgba(38, 211, 166, 0.45);
+      animation: gps-pulse 1.8s ease-out infinite;
+    }
+    @keyframes gps-pulse {
+      0% { width: 16px; height: 16px; opacity: 0.7; }
+      100% { width: 56px; height: 56px; opacity: 0; }
+    }
 
     @media (max-width: 640px) {
       .top-center { width: auto; }
@@ -2687,8 +2704,16 @@
     map.on("locationfound", e => {
       el.gpsBtn.classList.remove("active");
       if (state.userMarker) map.removeLayer(state.userMarker);
-      state.userMarker = L.circleMarker(e.latlng, { radius: 8, color: "#fff", weight: 3, fillColor: "#26d3a6", fillOpacity: 1 }).addTo(map).bindPopup("La tua posizione");
-      L.circle(e.latlng, { radius: e.accuracy || 20, color: "#26d3a6", weight: 1, fillColor: "#26d3a6", fillOpacity: .08 }).addTo(map);
+      state.userMarker = L.marker(e.latlng, {
+        interactive: false,
+        keyboard: false,
+        icon: L.divIcon({
+          className: "gps-marker",
+          html: '<div class="gps-pulse"></div><div class="gps-dot"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        })
+      }).addTo(map);
     });
     map.on("locationerror", () => { el.gpsBtn.classList.remove("active"); toast("GPS non disponibile."); });
 
