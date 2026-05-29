@@ -7,6 +7,7 @@
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -177,7 +178,7 @@
       background: linear-gradient(90deg, rgba(0,245,255,.16), rgba(5,10,18,.92) 42%, rgba(255,45,111,.14)), var(--panel);
       box-shadow: var(--shadow); backdrop-filter: blur(18px); white-space: nowrap;
     }
-    .status-pill strong { font-size: 13px; font-weight: 900; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; cursor: pointer; user-select: none; -webkit-user-select: none; transition: color .2s ease, text-shadow .2s ease; }
+    .status-pill strong { font-size: 13px; font-weight: 900; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; user-select: none; -webkit-user-select: none; transition: color .2s ease, text-shadow .2s ease; }
     .status-pill strong.eggs-on { color: var(--danger); text-shadow: 0 0 10px var(--danger); }
 
     .drawer {
@@ -269,14 +270,15 @@
       padding: 10px 18px;
       color: #0a0f18;
       background: #fff;
-      border: 2.5px solid #0a0f18;
-      border-radius: 22px;
-      font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", system-ui, sans-serif;
-      font-weight: 800;
-      font-size: 15px;
+      border: 3px solid #0a0f18;
+      border-radius: 2px;
+      font-family: "Press Start 2P", "Comic Sans MS", system-ui, sans-serif;
+      font-weight: 400;
+      font-size: 10px;
+      line-height: 1.4;
       letter-spacing: .01em;
       white-space: nowrap;
-      box-shadow: 4px 5px 0 0 #0a0f18, 0 14px 28px rgba(0,0,0,.45);
+      box-shadow: 3px 3px 0 0 #0a0f18;
       text-shadow: none;
       opacity: 0;
       animation: gandalf-fade .18s ease-out forwards;
@@ -292,10 +294,10 @@
       width: 14px;
       height: 14px;
       background: #fff;
-      border-right: 2.5px solid #0a0f18;
-      border-bottom: 2.5px solid #0a0f18;
+      border-right: 3px solid #0a0f18;
+      border-bottom: 3px solid #0a0f18;
       transform: translateX(-50%) rotate(45deg);
-      border-bottom-right-radius: 4px;
+      border-bottom-right-radius: 0;
     }
     @keyframes gandalf-fade {
       from { opacity: 0; }
@@ -451,6 +453,7 @@
     @keyframes hud-spin {
       to { transform: rotate(360deg); }
     }
+    .gps-master { pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)); }
     .gps-marker { pointer-events: none; }
     .gps-marker .gps-dot {
       position: absolute; left: 50%; top: 50%; width: 16px; height: 16px;
@@ -939,6 +942,7 @@
       measureMarkers: [],
       measureLine: null,
       userMarker: null,
+      userLatLng: null,
       pressTimer: null,
       lastPressLatLng: null,
       fiduciali: { visible: false, loading: false, fetchAbort: null, debounceTimer: null },
@@ -1065,7 +1069,7 @@
       map.createPane(name);
       map.getPane(name).style.zIndex = zIndex;
     });
-    ["ageaPane", "bingPane", "googlePane", "parcelPane", "buildingPane", "labelPane"].forEach(name => {
+    ["ageaPane", "bingPane", "googlePane", "parcelPane", "buildingPane", "labelPane", "isoipsePane"].forEach(name => {
       map.getPane(name).style.pointerEvents = "none";
     });
 
@@ -2707,6 +2711,7 @@
       localStorage.setItem(EGGS_KEY, eggsEnabled ? "1" : "0");
       el.brandTitle.classList.toggle("eggs-on", eggsEnabled);
       updateGandalf();
+      if (state.userLatLng) setUserMarker(state.userLatLng);
     });
 
     map.on("click", e => { if (state.measuring) { state.measurePoints.push(e.latlng); refreshMeasure(); } });
@@ -2716,19 +2721,56 @@
       state.pressTimer = setTimeout(() => identifyParcel(state.lastPressLatLng), 720);
     });
     map.on("mouseup touchend dragstart zoomstart move", () => clearTimeout(state.pressTimer));
+    // Marker GPS: classico (puntino teal) di default, "master" (easter egg) quando gli egg sono attivi.
+    const GPS_BUBBLE_TEXTS = ["Eccomi!", "Sono qui!"];
+    let gpsBubble = null, gpsBubbleTimer = null, gpsBubbleIdx = 0, gpsBubbleRunning = false;
+
+    function showGpsBubble() {
+      if (gpsBubble) { map.removeLayer(gpsBubble); gpsBubble = null; }
+      if (!state.userLatLng) return;
+      const text = GPS_BUBBLE_TEXTS[gpsBubbleIdx % GPS_BUBBLE_TEXTS.length];
+      gpsBubbleIdx++;
+      gpsBubble = L.tooltip({ permanent: true, direction: "top", offset: [0, -76], className: "gandalf-bubble", opacity: 1 })
+        .setLatLng(state.userLatLng).setContent(text).addTo(map);
+      gpsBubbleTimer = setTimeout(hideGpsBubble, 2000);
+    }
+    function hideGpsBubble() {
+      if (gpsBubble) { map.removeLayer(gpsBubble); gpsBubble = null; }
+      gpsBubbleTimer = setTimeout(showGpsBubble, 6000);
+    }
+    function startGpsBubble() {
+      if (gpsBubbleRunning) { if (gpsBubble && state.userLatLng) gpsBubble.setLatLng(state.userLatLng); return; }
+      gpsBubbleRunning = true;
+      gpsBubbleIdx = 0;
+      showGpsBubble();
+    }
+    function stopGpsBubble() {
+      gpsBubbleRunning = false;
+      if (gpsBubbleTimer) { clearTimeout(gpsBubbleTimer); gpsBubbleTimer = null; }
+      if (gpsBubble) { map.removeLayer(gpsBubble); gpsBubble = null; }
+    }
+
+    function setUserMarker(latlng) {
+      state.userLatLng = latlng;
+      if (state.userMarker) { map.removeLayer(state.userMarker); state.userMarker = null; }
+      if (eggsEnabled) {
+        state.userMarker = L.marker(latlng, {
+          interactive: false, keyboard: false,
+          icon: L.icon({ iconUrl: "master.png", className: "gps-master", iconSize: [26, 69], iconAnchor: [13, 69] })
+        }).addTo(map);
+        startGpsBubble();
+      } else {
+        stopGpsBubble();
+        state.userMarker = L.marker(latlng, {
+          interactive: false, keyboard: false,
+          icon: L.divIcon({ className: "gps-marker", html: '<div class="gps-pulse"></div><div class="gps-dot"></div>', iconSize: [16, 16], iconAnchor: [8, 8] })
+        }).addTo(map);
+      }
+    }
+
     map.on("locationfound", e => {
       el.gpsBtn.classList.remove("active");
-      if (state.userMarker) map.removeLayer(state.userMarker);
-      state.userMarker = L.marker(e.latlng, {
-        interactive: false,
-        keyboard: false,
-        icon: L.divIcon({
-          className: "gps-marker",
-          html: '<div class="gps-pulse"></div><div class="gps-dot"></div>',
-          iconSize: [16, 16],
-          iconAnchor: [8, 8]
-        })
-      }).addTo(map);
+      setUserMarker(e.latlng);
     });
     map.on("locationerror", () => { el.gpsBtn.classList.remove("active"); toast("GPS non disponibile."); });
 
@@ -3011,8 +3053,13 @@
       const EXPLOSION_LIFETIME = 1500;
       const EXPLOSION_SLOW_FACTOR = 2.5;
       const EXPLOSION_LEAD_T = 0.88;
+      const PLANE_END_T = 0.95;
       const APPROACH_ANGLES = [-130, 10, 140];
       const TARGET_Y_OFFSET = -30;
+      const EXPLOSION_Y_OFFSET = -20;
+      const MASTER_W = 35;
+      const MASTER_H = Math.round(MASTER_W * 227 / 86);
+      const MASTER_SPEED = 0.8;
 
       const mapSize = map.getSize();
       const offset = Math.hypot(mapSize.x, mapSize.y) * 0.65;
@@ -3040,6 +3087,14 @@
         return { img, startLatLng, angle };
       });
 
+      // master: spawna al via dell'esplosione dal centro, sotto l'esplosione, e scivola verso sud-est.
+      const masterImg = document.createElement('img');
+      masterImg.className = 'intro-master';
+      masterImg.alt = '';
+      masterImg.src = 'master.png';
+      masterImg.style.display = 'none';
+      layer.appendChild(masterImg);
+
       const explosionCanvas = document.createElement('canvas');
       explosionCanvas.className = 'intro-explosion';
       layer.appendChild(explosionCanvas);
@@ -3048,6 +3103,10 @@
       const sizeScale = () => Math.pow(2, map.getZoom() - DEFAULT_ZOOM);
       let planesActive = true;
       let explosionStarted = false;
+      let masterStarted = false;
+      let masterOff = false;
+      let explosionDone = false;
+      let cleaned = false;
       const t0 = performance.now();
 
       function render() {
@@ -3070,7 +3129,19 @@
           const es = EXPLOSION_SIZE * scale;
           explosion.style.width = es + 'px';
           explosion.style.height = es + 'px';
-          explosion.style.transform = `translate(${tp.x - es/2}px, ${tp.y - es/2}px)`;
+          explosion.style.transform = `translate(${tp.x - es/2}px, ${tp.y + EXPLOSION_Y_OFFSET - es/2}px)`;
+        }
+        if (masterStarted) {
+          const mw = MASTER_W * scale, mh = MASTER_H * scale;
+          const cx = tp.x, cy = tp.y + EXPLOSION_Y_OFFSET;
+          // stessa velocità degli aerei: gli aerei percorrono `offset` px per unità di t.
+          const dist = offset * MASTER_SPEED * Math.max(0, (performance.now() - t0) / DURATION - EXPLOSION_LEAD_T);
+          const mx = cx + dist * Math.SQRT1_2, my = cy + dist * Math.SQRT1_2;
+          masterImg.style.width = mw + 'px';
+          masterImg.style.height = mh + 'px';
+          masterImg.style.transform = `translate(${mx - mw/2}px, ${my - mh/2}px)`;
+          const sz = map.getSize();
+          if (mx - mw/2 > sz.x || my - mh/2 > sz.y) masterOff = true;
         }
       }
 
@@ -3079,19 +3150,24 @@
         if (!explosionStarted && t >= EXPLOSION_LEAD_T) {
           explosionStarted = true;
           explosion.style.display = 'block';
+          masterStarted = true;
+          masterImg.style.display = 'block';
           startExplosion();
         }
-        if (t >= 1 && planesActive) {
+        if (t >= PLANE_END_T && planesActive) {
           planesActive = false;
           planes.forEach(p => p.img.remove());
-          render();
-          return;
         }
         render();
+        if (masterStarted && masterOff) { maybeCleanup(); return; }
         requestAnimationFrame(tick);
       }
 
-      function cleanup() {
+      function maybeCleanup() {
+        if (cleaned) return;
+        if (!explosionDone) return;
+        if (masterStarted && !masterOff) return;
+        cleaned = true;
         map.off('zoom move', render);
         if (layer.parentNode) layer.remove();
       }
@@ -3105,7 +3181,7 @@
         explosion.replaceWith(img);
         explosion = img;
         render();
-        setTimeout(cleanup, EXPLOSION_LIFETIME);
+        setTimeout(() => { explosionDone = true; maybeCleanup(); }, EXPLOSION_LIFETIME);
       }
 
       async function playSlowGif(canvas, url, slow) {
@@ -3148,7 +3224,7 @@
       function startExplosion() {
         playSlowGif(explosionCanvas, 'explosion.gif?t=' + Date.now(), EXPLOSION_SLOW_FACTOR)
           .then(ok => {
-            if (ok) setTimeout(cleanup, 150);
+            if (ok) setTimeout(() => { explosionDone = true; maybeCleanup(); }, 150);
             else fallbackExplosion();
           })
           .catch(() => fallbackExplosion());

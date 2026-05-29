@@ -71,7 +71,7 @@ Ogni livello con almeno **2 punti** mostra accanto al toggle un pulsante "percor
 
 ### Strumenti sul campo
 - **Misura distanza**: tocchi successivi sulla mappa creano una polilinea con il totale in metri/km.
-- **La mia posizione (GPS)**: centra la mappa sulla posizione corrente con cerchio di accuratezza.
+- **La mia posizione (GPS)**: centra la mappa sulla posizione corrente e mostra un marker nel punto rilevato.
 - **Modalità offline**: salva lo stato (KML importati, vista corrente) in `localStorage` e pre-scarica i tasselli di mappa satellitare Google e catastale (particelle, fabbricati, etichette) dell'area dei KML caricati (zoom 17–18) nella Cache API del browser. Quando si è senza rete, il service worker (`sw.js`) intercetta le richieste tile dei provider noti e le serve direttamente dalla cache. Sul campo, senza connessione, basta "Ricarica offline" per ripristinare i KML e la vista.
 
 ---
