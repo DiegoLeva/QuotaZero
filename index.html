@@ -177,7 +177,8 @@
       background: linear-gradient(90deg, rgba(0,245,255,.16), rgba(5,10,18,.92) 42%, rgba(255,45,111,.14)), var(--panel);
       box-shadow: var(--shadow); backdrop-filter: blur(18px); white-space: nowrap;
     }
-    .status-pill strong { font-size: 13px; font-weight: 900; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; }
+    .status-pill strong { font-size: 13px; font-weight: 900; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; cursor: pointer; user-select: none; -webkit-user-select: none; transition: color .2s ease, text-shadow .2s ease; }
+    .status-pill strong.eggs-on { color: var(--danger); text-shadow: 0 0 10px var(--danger); }
 
     .drawer {
       position: fixed; z-index: 900; top: 12px; left: 12px; bottom: 12px;
@@ -496,7 +497,7 @@
   
   <div class="top-center">
     <div class="status-pill">
-      <strong>Quota_Zero</strong>
+      <strong id="brandTitle">Quota_Zero</strong>
     </div>
   </div>
 
@@ -920,6 +921,11 @@
 
     const prefs = loadPrefs();
 
+    // Easter egg (gandalf/aerei/esplosione): spenti di default, si accendono con un doppio click
+    // sulla scritta Quota_Zero (che cambia colore quando sono attivi). Stato salvato in localStorage.
+    const EGGS_KEY = "quotazero_eggs_v1";
+    let eggsEnabled = localStorage.getItem(EGGS_KEY) === "1";
+
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(err => console.warn("SW register failed", err));
     }
@@ -979,6 +985,7 @@
       layerSettingsClose: document.getElementById("layerSettingsClose"),
       layerSettingsBody: document.getElementById("layerSettingsBody"),
       fileInput: document.getElementById("fileInput"),
+      brandTitle: document.getElementById("brandTitle"),
       clearImported: document.getElementById("clearImported"),
       importedLayers: document.getElementById("importedLayers"),
       gpsBtn: document.getElementById("gpsBtn"),
@@ -2694,6 +2701,14 @@
     });
     el.deleteAllRilievo.addEventListener("click", deleteAllRilievo);
 
+    el.brandTitle.classList.toggle("eggs-on", eggsEnabled);
+    el.brandTitle.addEventListener("dblclick", () => {
+      eggsEnabled = !eggsEnabled;
+      localStorage.setItem(EGGS_KEY, eggsEnabled ? "1" : "0");
+      el.brandTitle.classList.toggle("eggs-on", eggsEnabled);
+      updateGandalf();
+    });
+
     map.on("click", e => { if (state.measuring) { state.measurePoints.push(e.latlng); refreshMeasure(); } });
     map.on("contextmenu", e => identifyParcel(e.latlng));
     map.on("mousedown touchstart", e => {
@@ -2907,6 +2922,7 @@
     let gandalfActive = false;
 
     function updateGandalf() {
+      if (!eggsEnabled) { if (map.hasLayer(gandalfOverlay)) map.removeLayer(gandalfOverlay); return; }
       const visible = map.getZoom() >= GANDALF_MIN_ZOOM;
       if (visible || gandalfActive || gandalfBubbleTimer) {
         if (!map.hasLayer(gandalfOverlay)) gandalfOverlay.addTo(map);
@@ -2977,6 +2993,7 @@
       "H917|500||1211"
     ]);
     function maybeTriggerGandalf(comune, foglio, allegato, particella) {
+      if (!eggsEnabled) return;
       if (!comune || !particella) return;
       const key = `${String(comune).toUpperCase()}|${foglio}|${(allegato || "").toUpperCase()}|${particella}`;
       if (GANDALF_KEYS.has(key)) showGandalfBubble();
@@ -3142,7 +3159,7 @@
       requestAnimationFrame(tick);
     }
 
-    map.whenReady(runIntroAnimation);
+    map.whenReady(() => { if (eggsEnabled) runIntroAnimation(); });
   </script>
 </body>
 </html>
